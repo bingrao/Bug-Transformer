@@ -1,0 +1,9 @@
+train_src: data/learning_fix/src-train.txt
+train_tgt: data/learning_fix/tgt-train.txt
+valid_src: data/learning_fix/src-val.txt
+valid_tgt: data/learning_fix/tgt-val.txt
+save_data: data/learning_fix/learning_fix
+src_seq_length: 46680
+tgt_seq_length: 46680
+src_seq_length_trunc: 400
+tgt_seq_length_trunc: 100

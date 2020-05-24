@@ -59,8 +59,8 @@ def build_embeddings(opt, text_field, for_encoder=True):
         word_vocab_size=num_word_embeddings,
         feat_vocab_sizes=num_feat_embeddings,
         sparse=opt.optim == "sparseadam",
-        fix_word_vecs=fix_word_vecs
-    )
+        fix_word_vecs=fix_word_vecs,
+        opt=opt)
     return emb
 
 

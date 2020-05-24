@@ -137,7 +137,8 @@ class Embeddings(nn.Module):
                  feat_vocab_sizes=[],
                  dropout=0,
                  sparse=False,
-                 fix_word_vecs=False):
+                 fix_word_vecs=False,
+                 opt=None):
         self._validate_args(feat_merge, feat_vocab_sizes, feat_vec_exponent,
                             feat_vec_size, feat_padding_idx)
 
@@ -196,8 +197,9 @@ class Embeddings(nn.Module):
         self.position_encoding = position_encoding
 
         if self.position_encoding:
-            pe = PositionalEncoding(dropout, self.embedding_size)
-            self.make_embedding.add_module('pe', pe)
+            # pe = PositionalEncoding(dropout, self.embedding_size)
+            # self.make_embedding.add_module('pe', pe)
+            self.pe = PositionalEncoding(dropout, self.embedding_size)
 
         if fix_word_vecs:
             self.word_lut.weight.requires_grad = False
@@ -268,11 +270,13 @@ class Embeddings(nn.Module):
         """
 
         if self.position_encoding:
-            for i, module in enumerate(self.make_embedding._modules.values()):
-                if i == len(self.make_embedding._modules.values()) - 1:
-                    source = module(source, step=step)
-                else:
-                    source = module(source)
+            source = self.make_embedding(source)
+            source = self.pe(source, step=step)
+            # for i, module in enumerate(self.make_embedding._modules.values()):
+            #     if i == len(self.make_embedding._modules.values()) - 1:
+            #         source = module(source, step=step)
+            #     else:
+            #         source = module(source)
         else:
             source = self.make_embedding(source)
 
@@ -280,4 +284,5 @@ class Embeddings(nn.Module):
 
     def update_dropout(self, dropout):
         if self.position_encoding:
-            self._modules['make_embedding'][1].dropout.p = dropout
+            self.pe.dropout.p = dropout
+            # self._modules['make_embedding'][1].dropout.p = dropout
