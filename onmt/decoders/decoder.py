@@ -208,6 +208,8 @@ class RNNDecoderBase(DecoderBase):
               ``(tgt_len, batch, hidden)``.
             * attns: distribution over src at each tgt
               ``(tgt_len, batch, src_len)``.
+              :param position:
+              :param step:
         """
 
         dec_state, dec_outs, attns = self._run_forward_pass(
