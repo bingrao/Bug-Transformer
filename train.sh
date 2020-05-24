@@ -9,15 +9,19 @@ dataset=$1
 
 case ${dataset} in
    "small")
+      set -x
       onmt_train -config examples/learning_fix/config/small_train_1G_1.yml
       ;;
    "small_old")
+      set -x
       onmt_train -config examples/learning_fix/config/small_train_1G_2.yml
       ;;
    "small_tree")
+      set -x
       onmt_train -config examples/learning_fix/config/small_train_1G_3.yml
       ;;
    "small_path")
+      set -x
       onmt_train -config examples/learning_fix/config/small_train_1G_4.yml
       ;;
    *)
