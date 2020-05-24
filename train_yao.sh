@@ -6,6 +6,8 @@ if [ "$#" -ne 1 ] ; then
 fi
 
 dataset=$1
+CurrentDate=$(date "+%Y-%m-%d-%H-%M-%S")
+ProjectLog=examples/learning_fix/log/${dataset}-${CurrentDate}.log
 
 case ${dataset} in
    "small")
@@ -14,7 +16,7 @@ case ${dataset} in
       ;;
    "small_old")
       set -x
-      onmt_train -config examples/learning_fix/config/small_train_1G_2.yml
+      onmt_train -config examples/learning_fix/config/small_train_1G_2.yml -log_file ${ProjectLog}
       ;;
    "small_tree")
       set -x
