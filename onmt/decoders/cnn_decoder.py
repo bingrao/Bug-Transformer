@@ -74,7 +74,7 @@ class CNNDecoder(DecoderBase):
     def detach_state(self):
         self.state["previous_input"] = self.state["previous_input"].detach()
 
-    def forward(self, tgt, memory_bank, step=None, **kwargs):
+    def forward(self, tgt, memory_bank, step=None, position=None, **kwargs):
         """ See :obj:`onmt.modules.RNNDecoderBase.forward()`"""
 
         if self.state["previous_input"] is not None:

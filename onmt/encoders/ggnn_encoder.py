@@ -149,7 +149,7 @@ class GGNNEncoder(EncoderBase):
                 m.weight.data.normal_(0.0, 0.02)
                 m.bias.data.fill_(0)
 
-    def forward(self, src, lengths=None):
+    def forward(self, src, lengths=None, position=None):
         """See :func:`EncoderBase.forward()`"""
         self._check_args(src, lengths)
         nodes = self.n_node
