@@ -1,0 +1,9 @@
+train_src: examples/learning_fix/data/small_old/train-buggy.txt
+train_tgt: examples/learning_fix/data/small_old/train-fixed.txt
+valid_src: examples/learning_fix/data/small_old/eval-buggy.txt
+valid_tgt: examples/learning_fix/data/small_old/eval-fixed.txt
+save_data: examples/learning_fix/data/small_old/small_old
+src_seq_length: 46680
+tgt_seq_length: 46680
+src_seq_length_trunc: 400
+tgt_seq_length_trunc: 100
