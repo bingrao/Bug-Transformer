@@ -1,5 +1,5 @@
-data: data/learning_fix/learning_fix
-save_model: data/learning_fix
+data: examples/learning_fix/data/small/small
+save_model: examples/learning_fix/data/small
 save_checkpoint_steps: 10000
 keep_checkpoint: 10
 seed: 3435
