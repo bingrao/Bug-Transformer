@@ -8,7 +8,7 @@ fi
 
 dataset=$1
 
-case dataset in
+case ${dataset} in
    "small")
       onmt_preprocess -config examples/learning_fix/config/small_preprocess_1G_1.yml
       ;;

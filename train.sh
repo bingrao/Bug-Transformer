@@ -7,7 +7,7 @@ fi
 
 dataset=$1
 
-case dataset in
+case ${dataset} in
    "small")
       onmt_train -config examples/learning_fix/config/small_train_1G_1.yml
       ;;
