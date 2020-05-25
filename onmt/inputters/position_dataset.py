@@ -8,7 +8,36 @@ from torchtext.data import Field, RawField
 from onmt.inputters.datareader_base import DataReaderBase
 
 
-class TextDataReader(DataReaderBase):
+def preprocess(data):
+    return list(map(lambda x: list(eval(x)), data.split(" ")))
+
+def pad_pos(data):
+    max_len = max(len(x) for x in data)
+    padded = []
+    for x in data:
+        padded.append(x + [0] * max(0, max_len - len(x)))
+    return padded
+
+def expand_pos(position, d_model):
+    import numpy as np
+    if type(position) is list:
+        index = list(filter(lambda x: x < d_model, position[1:]))
+        embedding = np.zeros(d_model, dtype=int)
+        embedding[index] = 1
+        return embedding
+    else:
+        position
+
+# https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled
+def postprocessing(data, arg=None):
+    d_model = 512
+    arr = []
+    for obj in data:
+        arr.append([expand_pos(pos, d_model) for pos in obj])
+    return arr
+
+
+class PositionDataReader(DataReaderBase):
     def read(self, sequences, side, _dir=None):
         """Read text data from disk.
 
@@ -16,7 +45,7 @@ class TextDataReader(DataReaderBase):
             sequences (str or Iterable[str]):
                 path to text file or iterable of the actual text data.
             side (str): Prefix used in return dict. Usually
-                ``"src"`` or ``"tgt"``.  --> "src_pos" and "tgt_pos" for positions
+                ``"src_pos"`` or ``"tgt_pos"``.
             _dir (NoneType): Leave as ``None``. This parameter exists to
                 conform with the :func:`DataReaderBase.read()` signature.
 
@@ -26,7 +55,7 @@ class TextDataReader(DataReaderBase):
             fields.
         """
         assert _dir is None or _dir == "", \
-            "Cannot use _dir with TextDataReader."
+            "Cannot use _dir with PositionDataReader."
         if isinstance(sequences, str):
             sequences = DataReaderBase._read_file(sequences)
         for i, seq in enumerate(sequences):
@@ -35,11 +64,11 @@ class TextDataReader(DataReaderBase):
             yield {side: seq, "indices": i}
 
 
-def text_sort_key(ex):
+def position_sort_key(ex):
     """Sort using the number of tokens in the sequence."""
-    if hasattr(ex, "tgt"):
-        return len(ex.src[0]), len(ex.tgt[0])
-    return len(ex.src[0])
+    if hasattr(ex, "tgt-pos"):
+        return len(ex.src_pos[0]), len(ex.tgt_pos[0])
+    return len(ex.src_pos[0])
 
 
 # mix this with partial
@@ -69,7 +98,7 @@ def _feature_tokenize(
     return tokens
 
 
-class TextMultiField(RawField):
+class PositionMultiField(RawField):
     """Container for subfields.
 
     Text data might use POS/NER/etc labels in addition to tokens.
@@ -89,7 +118,7 @@ class TextMultiField(RawField):
     """
 
     def __init__(self, base_name, base_field, feats_fields):
-        super(TextMultiField, self).__init__()
+        super(PositionMultiField, self).__init__()
         self.fields = [(base_name, base_field)]
         for name, ff in sorted(feats_fields, key=lambda kv: kv[0]):
             self.fields.append((name, ff))
@@ -98,40 +127,68 @@ class TextMultiField(RawField):
     def base_field(self):
         return self.fields[0][1]
 
-    def process(self, batch, device=None):
-        """Convert outputs of preprocess into Tensors.
-
+    def pad(self, minibatch):
+        """Pad a batch of examples to the length of the longest example.
         Args:
-            batch (List[List[List[str]]]): A list of length batch size.
-                Each element is a list of the preprocess results for each
-                field (which are lists of str "words" or feature tags.
-            device (torch.device or str): The device on which the tensor(s)
-                are built.
-
+            minibatch (List[torch.FloatTensor]): A list of audio data,
+                each having shape ``(len, n_feats, feat_dim)``
+                where len is variable.
         Returns:
-            torch.LongTensor or Tuple[LongTensor, LongTensor]:
-                A tensor of shape ``(seq_len, batch_size, len(self.fields))``
-                where the field features are ordered like ``self.fields``.
-                If the base field returns lengths, these are also returned
-                and have shape ``(batch_size,)``.
+            torch.FloatTensor or Tuple[torch.FloatTensor, List[int]]: The
+                padded tensor of shape
+                ``(batch_size, max_len, n_feats, feat_dim)``.
+                and a list of the lengths if `self.include_lengths` is `True`
+                else just returns the padded tensor.
         """
 
-        # batch (list(list(list))): batch_size x len(self.fields) x seq_len
-        batch_by_feat = list(zip(*batch))
-        base_data = self.base_field.process(batch_by_feat[0], device=device)
-        if self.base_field.include_lengths:
-            # lengths: batch_size
-            base_data, lengths = base_data
+        assert not self.pad_first and not self.truncate_first \
+            and not self.fix_length and self.sequential
+        minibatch = list(minibatch)
+        lengths = [x.size(0) for x in minibatch]
+        max_len = max(lengths)
+        nfeats = minibatch[0].size(1)
+        feat_dim = minibatch[0].size(2)
+        feats = torch.full((len(minibatch), max_len, nfeats, feat_dim),
+                           self.pad_token)
+        for i, (feat, len_) in enumerate(zip(minibatch, lengths)):
+            feats[i, 0:len_, :, :] = feat
+        if self.include_lengths:
+            return feats, lengths
+        return feats
 
-        feats = [ff.process(batch_by_feat[i], device=device)
-                 for i, (_, ff) in enumerate(self.fields[1:], 1)]
-        levels = [base_data] + feats
-        # data: seq_len x batch_size x len(self.fields)
-        data = torch.stack(levels, 2)
-        if self.base_field.include_lengths:
-            return data, lengths
-        else:
-            return data
+    def numericalize(self, arr, device=None):
+        """Turn a batch of examples that use this field into a Variable.
+        If the field has ``include_lengths=True``, a tensor of lengths will be
+        included in the return value.
+        Args:
+            arr (torch.FloatTensor or Tuple(torch.FloatTensor, List[int])):
+                List of tokenized and padded examples, or tuple of List of
+                tokenized and padded examples and List of lengths of each
+                example if self.include_lengths is True.
+            device (str or torch.device): See `Field.numericalize`.
+        """
+
+        assert self.use_vocab is False
+        if self.include_lengths and not isinstance(arr, tuple):
+            raise ValueError("Field has include_lengths set to True, but "
+                             "input data is not a tuple of "
+                             "(data batch, batch lengths).")
+        if isinstance(arr, tuple):
+            arr, lengths = arr
+            lengths = torch.tensor(lengths, dtype=torch.int, device=device)
+        arr = arr.to(device)
+
+        if self.postprocessing is not None:
+            arr = self.postprocessing(arr, None)
+
+        if self.sequential and not self.batch_first:
+            arr = arr.permute(1, 0, 2, 3)
+        if self.sequential:
+            arr = arr.contiguous()
+
+        if self.include_lengths:
+            return arr, lengths
+        return arr
 
     def preprocess(self, x):
         """Preprocess data.
@@ -140,18 +197,17 @@ class TextMultiField(RawField):
             x (str): A sentence string (words joined by whitespace).
 
         Returns:
-            List[List[str]]: A list of length ``len(self.fields)`` containing
+            List[List[Int]]: A list of length ``len(self.fields)`` containing
                 lists of tokens/feature tags for the sentence. The output
                 is ordered like ``self.fields``.
         """
-
         return [f.preprocess(x) for _, f in self.fields]
 
     def __getitem__(self, item):
         return self.fields[item]
 
 
-def text_fields(**kwargs):
+def position_fields(**kwargs):
     """Create text fields.
 
     Args:
@@ -164,7 +220,7 @@ def text_fields(**kwargs):
         truncate (bool or NoneType, optional): Defaults to ``None``.
 
     Returns:
-        TextMultiField
+        PositionMultiField
     """
 
     n_feats = kwargs["n_feats"]
@@ -187,8 +243,9 @@ def text_fields(**kwargs):
         feat = Field(
             init_token=bos, eos_token=eos,
             pad_token=pad, tokenize=tokenize,
-            include_lengths=use_len)
+            include_lengths=use_len, sequential=False, use_vocab=False,
+            preprocessing=preprocess, postprocessing=postprocessing)
         fields_.append((name, feat))
     assert fields_[0][0] == base_name  # sanity check
-    field = TextMultiField(fields_[0][0], fields_[0][1], fields_[1:])
+    field = PositionMultiField(fields_[0][0], fields_[0][1], fields_[1:])
     return field

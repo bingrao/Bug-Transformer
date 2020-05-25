@@ -46,20 +46,42 @@ def check_existing_pt_files(opt, corpus_type, ids, existing_fields):
 
 
 def process_one_shard(corpus_params, params):
+    """
+    1.  Iteration loading data shards and fill them into corresponding items in the fileds
+    2.  During above process, it also generates a src/tgt vocabularies.
+    :param corpus_params:
+    :param params:
+    :return:
+    """
     corpus_type, fields, src_reader, tgt_reader, align_reader, opt,\
-         existing_fields, src_vocab, tgt_vocab = corpus_params
-    i, (src_shard, tgt_shard, align_shard, maybe_id, filter_pred) = params
+         existing_fields, src_vocab, tgt_vocab, src_pos_reader, tgt_pos_reader = corpus_params
+    i, (src_shard, tgt_shard, align_shard, maybe_id, filter_pred, src_pos_shard, tgt_pos_shard) = params
     # create one counter per shard
     sub_sub_counter = defaultdict(Counter)
     assert len(src_shard) == len(tgt_shard)
     logger.info("Building shard %d." % i)
 
     src_data = {"reader": src_reader, "data": src_shard, "dir": opt.src_dir}
-    tgt_data = {"reader": tgt_reader, "data": tgt_shard, "dir": None}
-    align_data = {"reader": align_reader, "data": align_shard, "dir": None}
-    _readers, _data, _dir = inputters.Dataset.config(
-        [('src', src_data), ('tgt', tgt_data), ('align', align_data)])
+    src_data_pos = {"reader": src_pos_reader, "data": src_pos_shard, "dir": None} \
+        if src_pos_reader is not None and src_pos_shard is not None else None
 
+    tgt_data = {"reader": tgt_reader, "data": tgt_shard, "dir": None}
+    tgt_data_pos = {"reader": tgt_pos_reader, "data": tgt_pos_shard, "dir": None} \
+        if tgt_pos_reader is not None and tgt_pos_shard is not None else None
+
+    align_data = {"reader": align_reader, "data": align_shard, "dir": None}
+
+    dataset_config = [('src', src_data), ('tgt', tgt_data), ('align', align_data)]
+
+    if src_data_pos is not None:
+        dataset_config.append(('src_pos', src_data_pos))
+
+    if tgt_data_pos is not None:
+        dataset_config.append(('tgt_pos', tgt_data_pos))
+
+    _readers, _data, _dir = inputters.Dataset.config(dataset_config)
+
+    # Reading (_readers) data from (_data) and save them as corresponding (fields)
     dataset = inputters.Dataset(
         fields, readers=_readers, data=_data, dirs=_dir,
         sort_key=inputters.str2sortkey[opt.data_type],
@@ -68,10 +90,9 @@ def process_one_shard(corpus_params, params):
     )
     if corpus_type == "train" and existing_fields is None:
         for ex in dataset.examples:
-            sub_sub_counter['corpus_id'].update(
-                ["train" if maybe_id is None else maybe_id])
+            sub_sub_counter['corpus_id'].update(["train" if maybe_id is None else maybe_id])
             for name, field in fields.items():
-                if ((opt.data_type == "audio") and (name == "src")):
+                if ((opt.data_type == "audio") and (name == "src")) or name == "src_pos" or name == "tgt_pos":
                     continue
                 try:
                     f_iter = iter(field)
@@ -80,8 +101,7 @@ def process_one_shard(corpus_params, params):
                     all_data = [getattr(ex, name, None)]
                 else:
                     all_data = getattr(ex, name)
-                for (sub_n, sub_f), fd in zip(
-                        f_iter, all_data):
+                for (sub_n, sub_f), fd in zip(f_iter, all_data):
                     has_vocab = (sub_n == 'src' and
                                  src_vocab is not None) or \
                                 (sub_n == 'tgt' and
@@ -132,22 +152,29 @@ def maybe_load_vocab(corpus_type, counters, opt):
 
 
 def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
-                       align_reader, opt):
+                       align_reader, opt, src_pos_reader=None, tgt_pos_reader=None):
     assert corpus_type in ['train', 'valid']
 
     if corpus_type == 'train':
         counters = defaultdict(Counter)
         srcs = opt.train_src
+        srcs_pos = opt.train_src_pos
+
         tgts = opt.train_tgt
+        tgts_pos = opt.train_tgt_pos
         ids = opt.train_ids
         aligns = opt.train_align
     elif corpus_type == 'valid':
         counters = None
         srcs = [opt.valid_src]
+        srcs_pos = opt.train_src_pos
+
         tgts = [opt.valid_tgt]
+        tgts_pos = opt.train_tgt_pos
         ids = [None]
         aligns = [opt.valid_align]
-
+        
+    # Check if exist src_vocab, tgt_vocab and fields provided by users
     src_vocab, tgt_vocab, existing_fields = maybe_load_vocab(
         corpus_type, counters, opt)
 
@@ -178,8 +205,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
                                    "shards already exist"
                                    .format(maybe_id))
                     continue
-            if ((corpus_type == "train" or opt.filter_valid)
-                    and tgt is not None):
+            if (corpus_type == "train" or opt.filter_valid) and tgt is not None:
                 filter_pred = partial(
                     inputters.filter_example,
                     use_src_len=opt.data_type == "text",
@@ -190,17 +216,61 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
             src_shards = split_corpus(src, opt.shard_size)
             tgt_shards = split_corpus(tgt, opt.shard_size)
             align_shards = split_corpus(maybe_align, opt.shard_size)
-            for i, (ss, ts, a_s) in enumerate(
-                    zip(src_shards, tgt_shards, align_shards)):
-                yield (i, (ss, ts, a_s, maybe_id, filter_pred))
 
-    shard_iter = shard_iterator(srcs, tgts, ids, aligns, existing_shards,
-                                existing_fields, corpus_type, opt)
+            for i, (ss, ts, a_s) in enumerate(zip(src_shards, tgt_shards, align_shards)):
+                yield i, (ss, ts, a_s, maybe_id, filter_pred, None, None)
+
+
+    def shard_iterator_with_position(srcs, tgts, ids, aligns, existing_shards,
+                       existing_fields, corpus_type, opt, srcs_pos, tgts_pos):
+        """
+        Builds a single iterator yielding every shard of every corpus.
+        """
+        for src, tgt, maybe_id, maybe_align, src_pos, tgt_pos in zip(srcs, tgts, ids, aligns, srcs_pos, tgts_pos):
+            if maybe_id in existing_shards:
+                if opt.overwrite:
+                    logger.warning("Overwrite shards for corpus {}"
+                                   .format(maybe_id))
+                else:
+                    if corpus_type == "train":
+                        assert existing_fields is not None,\
+                            ("A 'vocab.pt' file should be passed to "
+                             "`-src_vocab` when adding a corpus to "
+                             "a set of already existing shards.")
+                    logger.warning("Ignore corpus {} because "
+                                   "shards already exist"
+                                   .format(maybe_id))
+                    continue
+            if (corpus_type == "train" or opt.filter_valid) and tgt is not None:
+                filter_pred = partial(
+                    inputters.filter_example,
+                    use_src_len=opt.data_type == "text",
+                    max_src_len=opt.src_seq_length,
+                    max_tgt_len=opt.tgt_seq_length)
+            else:
+                filter_pred = None
+            src_shards = split_corpus(src, opt.shard_size)
+            src_pos_shards = split_corpus(src_pos, opt.shard_size)
+            tgt_shards = split_corpus(tgt, opt.shard_size)
+
+            tgt_pos_shards = split_corpus(tgt_pos, opt.shard_size)
+            align_shards = split_corpus(maybe_align, opt.shard_size)
+
+            for i, (ss, ts, a_s, sp, tp) in enumerate(
+                    zip(src_shards, tgt_shards, align_shards, src_pos_shards, tgt_pos_shards)):
+                yield i, (ss, ts, a_s, maybe_id, filter_pred, sp, tp)
+
+    # Loading data from disk and save them as a shard of lines
+    if srcs_pos is not None and tgts_pos is not None:
+        shard_iter = shard_iterator_with_position(srcs, tgts, ids, aligns, existing_shards,
+                                                  existing_fields, corpus_type, opt, srcs_pos, tgts_pos)
+    else:
+        shard_iter = shard_iterator(srcs, tgts, ids, aligns, existing_shards, existing_fields, corpus_type, opt)
 
     with Pool(opt.num_threads) as p:
         dataset_params = (corpus_type, fields, src_reader, tgt_reader,
                           align_reader, opt, existing_fields,
-                          src_vocab, tgt_vocab)
+                          src_vocab, tgt_vocab, src_pos_reader, tgt_pos_reader)
         func = partial(process_one_shard, dataset_params)
         for sub_counter in p.imap(func, shard_iter):
             if sub_counter is not None:
@@ -263,10 +333,7 @@ def preprocess(opt):
 
     logger.info("Extracting features...")
 
-    src_nfeats = 0
-    tgt_nfeats = 0
-    src_nfeats = count_features(opt.train_src[0]) if opt.data_type == 'text' \
-        else 0
+    src_nfeats = count_features(opt.train_src[0]) if opt.data_type == 'text' else 0
     tgt_nfeats = count_features(opt.train_tgt[0])  # tgt always text so far
     if len(opt.train_src) > 1 and opt.data_type == 'text':
         for src, tgt in zip(opt.train_src[1:], opt.train_tgt[1:]):
@@ -287,20 +354,26 @@ def preprocess(opt):
         dynamic_dict=opt.dynamic_dict,
         with_align=opt.train_align[0] is not None,
         src_truncate=opt.src_seq_length_trunc,
-        tgt_truncate=opt.tgt_seq_length_trunc)
+        tgt_truncate=opt.tgt_seq_length_trunc, opt=opt)
 
     src_reader = inputters.str2reader[opt.data_type].from_opt(opt)
+    src_pos_reader = inputters.str2reader["text"].from_opt(opt) \
+        if opt.train_src_pos is not None or opt.valid_src_pos is not None else None
+
     tgt_reader = inputters.str2reader["text"].from_opt(opt)
+    tgt_pos_reader = inputters.str2reader["text"].from_opt(opt) \
+        if opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None else None
+
     align_reader = inputters.str2reader["text"].from_opt(opt)
 
     logger.info("Building & saving training data...")
-    build_save_dataset(
-        'train', fields, src_reader, tgt_reader, align_reader, opt)
+    build_save_dataset('train', fields, src_reader, tgt_reader, align_reader, opt,
+                       src_pos_reader=src_pos_reader, tgt_pos_reader=tgt_pos_reader)
 
     if opt.valid_src and opt.valid_tgt:
         logger.info("Building & saving validation data...")
-        build_save_dataset(
-            'valid', fields, src_reader, tgt_reader, align_reader, opt)
+        build_save_dataset('valid', fields, src_reader, tgt_reader, align_reader, opt,
+                           src_pos_reader=src_pos_reader, tgt_pos_reader=tgt_pos_reader)
 
 
 def _get_parser():

@@ -235,8 +235,14 @@ def preprocess_opts(parser):
 
     group.add('--train_src', '-train_src', required=True, nargs='+',
               help="Path(s) to the training source data")
+    group.add('--train_src_pos', '-train_src_pos', nargs='+',
+              help="Path(s) to the training source position data")
+
     group.add('--train_tgt', '-train_tgt', required=True, nargs='+',
               help="Path(s) to the training target data")
+    group.add('--train_tgt_pos', '-train_tgt_pos', nargs='+',
+              help="Path(s) to the training target position data")
+
     group.add('--train_align', '-train_align', nargs='+', default=[None],
               help="Path(s) to the training src-tgt alignment")
     group.add('--train_ids', '-train_ids', nargs='+', default=[None],
@@ -244,8 +250,13 @@ def preprocess_opts(parser):
 
     group.add('--valid_src', '-valid_src',
               help="Path to the validation source data")
+    group.add('--valid_src_pos', '-valid_src_pos',
+              help="Path to the validation source position data")
     group.add('--valid_tgt', '-valid_tgt',
               help="Path to the validation target data")
+    group.add('--valid_tgt_pos', '-valid_tgt_pos',
+              help="Path to the validation target position data")
+
     group.add('--valid_align', '-valid_align', default=None,
               help="Path(s) to the validation src-tgt alignment")
 

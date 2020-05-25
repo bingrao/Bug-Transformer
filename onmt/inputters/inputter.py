@@ -17,6 +17,7 @@ from onmt.inputters.text_dataset import text_fields, TextMultiField
 from onmt.inputters.image_dataset import image_fields
 from onmt.inputters.audio_dataset import audio_fields
 from onmt.inputters.vec_dataset import vec_fields
+from onmt.inputters.position_dataset import position_fields
 from onmt.utils.logging import logger
 # backwards compatibility
 from onmt.inputters.text_dataset import _feature_tokenize  # noqa: F401
@@ -24,7 +25,6 @@ from onmt.inputters.image_dataset import (  # noqa: F401
     batch_img as make_img)
 
 import gc
-
 
 # monkey-patch to make torchtext Vocab's pickleable
 def _getstate(self):
@@ -109,10 +109,12 @@ def get_fields(
     dynamic_dict=False,
     with_align=False,
     src_truncate=None,
-    tgt_truncate=None
+    tgt_truncate=None,
+    opt=None
 ):
     """
     Args:
+        opt:
         src_data_type: type of the source input. Options are [text|img|audio].
         n_src_feats (int): the number of source features (not counting tokens)
             to create a :class:`torchtext.data.Field` for. (If
@@ -146,7 +148,8 @@ def get_fields(
     fields_getters = {"text": text_fields,
                       "img": image_fields,
                       "audio": audio_fields,
-                      "vec": vec_fields}
+                      "vec": vec_fields,
+                      "position": position_fields}
 
     src_field_kwargs = {"n_feats": n_src_feats,
                         "include_lengths": True,
@@ -155,12 +158,18 @@ def get_fields(
                         "base_name": "src"}
     fields["src"] = fields_getters[src_data_type](**src_field_kwargs)
 
+
+    if opt is not None and (opt.train_src_pos is not None or opt.valid_src_pos is not None):
+        fields["src_pos"] = fields_getters["position"](**src_field_kwargs)
     tgt_field_kwargs = {"n_feats": n_tgt_feats,
                         "include_lengths": False,
                         "pad": pad, "bos": bos, "eos": eos,
                         "truncate": tgt_truncate,
                         "base_name": "tgt"}
     fields["tgt"] = fields_getters["text"](**tgt_field_kwargs)
+
+    if opt is not None and (opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None):
+        fields["tgt_pos"] = fields_getters["position"](**tgt_field_kwargs)
 
     indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
     fields["indices"] = indices

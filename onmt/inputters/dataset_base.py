@@ -112,13 +112,47 @@ class Dataset(TorchtextDataset):
         self.sort_key = sort_key
         can_copy = 'src_map' in fields and 'alignment' in fields
 
-        read_iters = [r.read(dat[1], dat[0], dir_) for r, dat, dir_
-                      in zip(readers, data, dirs)]
+        read_iters = [r.read(dat[1], dat[0], dir_) for r, dat, dir_ in zip(readers, data, dirs)]
 
         # self.src_vocabs is used in collapse_copy_scores and Translator.py
         self.src_vocabs = []
         examples = []
         for ex_dict in starmap(_join_dicts, zip(*read_iters)):
+            """
+            ex_dict is one of items in the dataseet with a dict format
+            {
+             src: 'public void Method_0 ( ) { Varl_0 = false ; try { Varl_1 . Method_1 ( ) ; } catch 
+                   ( java.io.IOException Varl_2 ) { Varl_2 . Method_2 ( ) ; error = String_0 + 
+                   ( Varl_2 . toString ( ) ) ; } }
+             
+             tgt: 'public void Method_0 ( ) { Varl_1 . setText ( Varl_2 ) ; Varl_0 . Method_1 ( Varl_1 ) ; 
+                   Varl_0 . Method_2 ( new Type_0 ( ) ) ; }'
+             
+             src_pos: '[108,3,15,22] [108,5,15,22] [108,4,15,22] [108,0,15,22] [108,2,16,23] [108,0,14,25,32]
+                       [108,3,10,18,25,37,48,55] [108,0,11,18,30,41,48] [108,4,12,19,31,42,49] [108,6,10,22,33,40]
+                       [108,4,15,26,33] [108,0,10,19,30,41,48] [108,3,11,18,26,35,46,57,64] [108,0,11,18,26,35,46,57,64]
+                       [108,4,12,19,27,36,47,58,65] [108,0,12,19,27,36,47,58,65] [108,2,13,20,28,37,48,59,66]
+                       [108,6,10,18,27,38,49,56] [108,1,11,20,31,42,49] [108,4,12,23,34,41] [108,0,12,20,31,42,49] 
+                       [108,4,11,19,29,37,48,59,66] [108,4,11,21,29,40,51,58] [108,1,13,21,32,43,50] 
+                       [108,0,12,22,30,41,52,59] [108,4,11,21,29,40,51,58] [108,0,11,18,28,38,46,57,68,75] 
+                       [108,4,12,19,29,39,47,58,69,76] [108,0,12,19,29,39,47,58,69,76] [108,2,13,20,30,40,48,59,70,77] 
+                       [108,6,10,20,30,38,49,60,67] [108,3,10,18,26,35,45,53,64,75,82] [108,0,11,19,28,38,46,57,68,75] 
+                       [108,3,12,20,28,37,47,55,66,77,84] [108,0,12,20,28,37,47,55,66,77,84] [108,0,11,20,28,36,45,55,63,74,85,92] 
+                       [108,4,11,21,29,40,51,58] [108,0,11,20,29,37,45,54,64,72,83,94,101] 
+                       [108,4,12,21,30,38,46,55,65,73,84,95,102] [108,0,12,21,30,38,46,55,65,73,84,95,102] 
+                       [108,2,13,22,31,39,47,56,66,74,85,96,103] [108,1,12,21,29,37,46,56,64,75,86,93] 
+                       [108,6,11,20,30,38,49,60,67] [108,1,13,23,31,42,53,60] [108,1,15,26,33]'
+             
+             tgt_pos: '[74,3,15,22] [74,5,15,22] [74,4,15,22] [74,0,15,22] [74,2,16,23] [74,0,15,26,33] 
+                       [74,3,12,21,28,41,52,59] [74,0,12,20,32,43,50] [74,4,13,21,33,44,51] [74,0,13,21,33,44,51] 
+                       [74,3,12,21,29,41,52,59] [74,2,14,22,34,45,52] [74,6,11,23,34,41] [74,3,10,19,26,39,50,57] 
+                       [74,0,12,19,32,43,50] [74,4,13,20,33,44,51] [74,0,13,20,33,44,51] [74,3,12,21,28,41,52,59] 
+                       [74,2,14,21,34,45,52] [74,6,10,23,34,41] [74,3,10,19,26,39,50,57] [74,0,12,21,32,43,50] 
+                       [74,4,13,22,33,44,51] [74,0,13,22,33,44,51] [74,1,13,22,31,42,53,60] [74,4,11,22,31,40,51,62,69] 
+                       [74,2,14,23,32,43,54,61] [74,8,15,24,33,44,55,62] [74,2,14,23,34,45,52] [74,6,12,23,34,41] 
+                       [74,1,16,27,34]'
+            } 
+            """
             if corpus_id is not None:
                 ex_dict["corpus_id"] = corpus_id
             else:
@@ -127,12 +161,14 @@ class Dataset(TorchtextDataset):
                 src_field = fields['src']
                 tgt_field = fields['tgt']
                 # this assumes src_field and tgt_field are both text
-                src_ex_vocab, ex_dict = _dynamic_dict(
-                    ex_dict, src_field.base_field, tgt_field.base_field)
+                src_ex_vocab, ex_dict = _dynamic_dict(ex_dict, src_field.base_field, tgt_field.base_field)
                 self.src_vocabs.append(src_ex_vocab)
-            ex_fields = {k: [(k, v)] for k, v in fields.items() if
-                         k in ex_dict}
-            ex = Example.fromdict(ex_dict, ex_fields)
+            ex_fields = {k: [(k, v)] for k, v in fields.items() if k in ex_dict}
+
+            # An instance of Example with src, tgt, src_pos, tgt_pos fields. The content of each fields is a list,
+            # Rather than a string, of a item.
+            ex = Example.fromdict(data=ex_dict, fields=ex_fields)
+
             examples.append(ex)
 
         # fields needs to have only keys that examples have as attrs

@@ -1,0 +1,15 @@
+train_src: examples/learning_fix/data/small/train-buggy.txt
+train_tgt: examples/learning_fix/data/small/train-fixed.txt
+valid_src: examples/learning_fix/data/small/eval-buggy.txt
+valid_tgt: examples/learning_fix/data/small/eval-fixed.txt
+
+train_src_pos: examples/learning_fix/data/small/train-buggy-pos.txt
+train_tgt_pos: examples/learning_fix/data/small/train-fixed-pos.txt
+valid_src_pos: examples/learning_fix/data/small/eval-buggy-pos.txt
+valid_tgt_pos: examples/learning_fix/data/small/eval-fixed-pos.txt
+
+save_data: examples/learning_fix/data/small/small
+src_seq_length: 46680
+tgt_seq_length: 46680
+src_seq_length_trunc: 400
+tgt_seq_length_trunc: 100
