@@ -148,8 +148,7 @@ class PositionMultiField(RawField):
         max_len = max(lengths)
         nfeats = minibatch[0].size(1)
         feat_dim = minibatch[0].size(2)
-        feats = torch.full((len(minibatch), max_len, nfeats, feat_dim),
-                           self.pad_token)
+        feats = torch.full((len(minibatch), max_len, nfeats, feat_dim), self.pad_token)
         for i, (feat, len_) in enumerate(zip(minibatch, lengths)):
             feats[i, 0:len_, :, :] = feat
         if self.include_lengths:

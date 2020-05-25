@@ -156,11 +156,18 @@ def get_fields(
                         "pad": pad, "bos": None, "eos": None,
                         "truncate": src_truncate,
                         "base_name": "src"}
+
     fields["src"] = fields_getters[src_data_type](**src_field_kwargs)
 
-
     if opt is not None and (opt.train_src_pos is not None or opt.valid_src_pos is not None):
-        fields["src_pos"] = fields_getters["position"](**src_field_kwargs)
+        src_pos_field_kwargs = {"n_feats": n_src_feats,
+                                "include_lengths": True,
+                                "pad": pad, "bos": None,
+                                "eos": None,
+                                "truncate": src_truncate,
+                                "base_name": "src_pos"}
+        fields["src_pos"] = fields_getters["position"](**src_pos_field_kwargs)
+
     tgt_field_kwargs = {"n_feats": n_tgt_feats,
                         "include_lengths": False,
                         "pad": pad, "bos": bos, "eos": eos,
@@ -169,7 +176,12 @@ def get_fields(
     fields["tgt"] = fields_getters["text"](**tgt_field_kwargs)
 
     if opt is not None and (opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None):
-        fields["tgt_pos"] = fields_getters["position"](**tgt_field_kwargs)
+        tgt_pos_field_kwargs = {"n_feats": n_tgt_feats,
+                                "include_lengths": False,
+                                "pad": pad, "bos": bos, "eos": eos,
+                                "truncate": tgt_truncate,
+                                "base_name": "tgt_pos"}
+        fields["tgt_pos"] = fields_getters["position"](**tgt_pos_field_kwargs)
 
     indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
     fields["indices"] = indices
