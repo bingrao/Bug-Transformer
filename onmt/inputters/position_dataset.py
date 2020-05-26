@@ -3,7 +3,7 @@ from functools import partial
 
 import six
 import torch
-from torchtext.data import Field
+from torchtext.data import Field, RawField
 
 from onmt.inputters.datareader_base import DataReaderBase
 
@@ -27,7 +27,7 @@ def postprocessing(data, arg=None):
     d_model = 512
     arr = []
     for obj in data:
-        arr.append([expand_pos(pos, d_model) for pos in obj])
+        arr.append([expand_pos(pos, d_model) for pos in obj[0]])
     return arr
 
 
@@ -116,7 +116,7 @@ class PositionMultiField(Field):
         self.fields = [(base_name, base_field)]
         for name, ff in sorted(feats_fields, key=lambda kv: kv[0]):
             self.fields.append((name, ff))
-
+        self.preprocess()
     @property
     def base_field(self):
         return self.fields[0][1]
@@ -148,10 +148,14 @@ class PositionMultiField(Field):
 
         padded = []
         for x in minibatch:
-            padded.append(x + [0] * max(0, max_len - len(x)))
+            x[0].extend([[0, 0] for i in range(max_len - len(x[0]))])
+            padded.append(x)
         if self.include_lengths:
             return padded, lengths
         return padded
+
+    def postprocess(self, x):
+        return [f.postprocessing(x) for _, f in self.fields]
 
     def numericalize(self, arr, device=None):
         """Turn a batch of examples that use this field into a Variable.
@@ -173,17 +177,17 @@ class PositionMultiField(Field):
         if isinstance(arr, tuple):
             arr, lengths = arr
             lengths = torch.tensor(lengths, dtype=torch.int, device=device)
-        arr = postprocessing(arr)
-        # if self.postprocessing is not None:
-        #     arr = self.postprocessing(arr, None)
+        # arr = postprocessing(arr)
+
+        arr = self.postprocess(arr)
 
         arr = torch.tensor(arr, dtype=self.dtype, device=device)
 
-        if self.sequential and not self.batch_first:
-            arr = arr.permute(1, 0, 2, 3)
+        # if self.sequential and not self.batch_first:
+        #     arr = arr.permute(1, 0, 2, 3)
 
-        if self.sequential:
-            arr = arr.contiguous()
+        # if self.sequential:
+        #     arr = arr.contiguous()
 
         if self.include_lengths:
             return arr, lengths
@@ -201,6 +205,8 @@ class PositionMultiField(Field):
                 is ordered like ``self.fields``.
         """
         return [f.preprocess(x) for _, f in self.fields]
+
+
 
     def process(self, batch, device=None):
         """ Process a list of examples to create a torch.Tensor.
@@ -250,7 +256,7 @@ def position_fields(**kwargs):
         name = base_name + "_feat_" + str(i - 1) if i > 0 else base_name
         use_len = i == 0 and include_lengths
         feat = Field(pad_token=pad, include_lengths=use_len, sequential=False,
-                     use_vocab=False, preprocessing=preprocess, postprocessing=postprocessing)
+                     use_vocab=False, preprocessing=partial(preprocess), postprocessing=partial(postprocessing))
         fields_.append((name, feat))
     assert fields_[0][0] == base_name  # sanity check
     field = PositionMultiField(fields_[0][0], fields_[0][1], fields_[1:])
