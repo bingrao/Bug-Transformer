@@ -8,10 +8,6 @@ from torchtext.data import Field, RawField
 from onmt.inputters.datareader_base import DataReaderBase
 
 
-def preprocess(data):
-    return list(map(lambda x: list(eval(x)), data.split(" ")))
-
-
 def expand_pos(position, d_model):
     import numpy as np
     if type(position) is list:
@@ -22,6 +18,7 @@ def expand_pos(position, d_model):
     else:
         position
 
+
 # https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled
 def postprocessing(data, arg=None):
     d_model = 512
@@ -29,6 +26,17 @@ def postprocessing(data, arg=None):
     for obj in data:
         arr.append([expand_pos(pos, d_model) for pos in obj[0]])
     return arr
+
+
+def preprocess(data):
+    def _tensor(ele, dim=256):
+        nums = len(ele) - 1
+        index = torch.LongTensor([[0] * nums, ele[1:]])
+        value = torch.FloatTensor([1] * nums)
+        return torch.sparse.FloatTensor(index, value, torch.Size([1, dim])).to_dense()
+    d_model = 256
+    listData = list(map(lambda x: list(eval(x)), data.split(" ")))
+    return torch.cat(list(map(lambda x: _tensor(x, d_model), listData)))
 
 
 class PositionDataReader(DataReaderBase):
@@ -134,7 +142,7 @@ class PositionMultiField(Field):
         """
 
         assert not self.pad_first and not self.truncate_first \
-            and not self.fix_length and self.sequential
+               and not self.fix_length and self.sequential
 
         minibatch = list(minibatch)
         lengths = [len(x[0]) for x in minibatch]
@@ -205,8 +213,6 @@ class PositionMultiField(Field):
                 is ordered like ``self.fields``.
         """
         return [f.preprocess(x) for _, f in self.fields]
-
-
 
     def process(self, batch, device=None):
         """ Process a list of examples to create a torch.Tensor.
