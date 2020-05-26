@@ -116,7 +116,7 @@ class PositionMultiField(Field):
         self.fields = [(base_name, base_field)]
         for name, ff in sorted(feats_fields, key=lambda kv: kv[0]):
             self.fields.append((name, ff))
-        self.preprocess()
+
     @property
     def base_field(self):
         return self.fields[0][1]
