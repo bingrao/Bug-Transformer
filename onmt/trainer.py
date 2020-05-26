@@ -242,8 +242,7 @@ class Trainer(object):
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
 
-        for i, (batches, normalization) in enumerate(
-                self._accum_batches(train_iter)):
+        for i, (batches, normalization) in enumerate(self._accum_batches(train_iter)):
             step = self.optim.training_step
             # UPDATE DROPOUT
             self._maybe_update_dropout(step)
@@ -256,13 +255,10 @@ class Trainer(object):
                             % (self.gpu_rank, i + 1, len(batches)))
 
             if self.n_gpu > 1:
-                normalization = sum(onmt.utils.distributed
-                                    .all_gather_list
-                                    (normalization))
+                normalization = sum(onmt.utils.distributed.all_gather_list(normalization))
 
-            self._gradient_accumulation(
-                batches, normalization, total_stats,
-                report_stats)
+            # Here submit batch for traning ...
+            self._gradient_accumulation(batches, normalization, total_stats, report_stats)
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)

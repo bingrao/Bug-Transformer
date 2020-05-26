@@ -3,7 +3,7 @@ from functools import partial
 
 import six
 import torch
-from torchtext.data import Field, RawField
+from torchtext.data import Field
 
 from onmt.inputters.datareader_base import DataReaderBase
 
@@ -11,12 +11,6 @@ from onmt.inputters.datareader_base import DataReaderBase
 def preprocess(data):
     return list(map(lambda x: list(eval(x)), data.split(" ")))
 
-def pad_pos(data):
-    max_len = max(len(x) for x in data)
-    padded = []
-    for x in data:
-        padded.append(x + [0] * max(0, max_len - len(x)))
-    return padded
 
 def expand_pos(position, d_model):
     import numpy as np
@@ -98,7 +92,7 @@ def _feature_tokenize(
     return tokens
 
 
-class PositionMultiField(RawField):
+class PositionMultiField(Field):
     """Container for subfields.
 
     Text data might use POS/NER/etc labels in addition to tokens.
@@ -130,9 +124,7 @@ class PositionMultiField(RawField):
     def pad(self, minibatch):
         """Pad a batch of examples to the length of the longest example.
         Args:
-            minibatch (List[torch.FloatTensor]): A list of audio data,
-                each having shape ``(len, n_feats, feat_dim)``
-                where len is variable.
+
         Returns:
             torch.FloatTensor or Tuple[torch.FloatTensor, List[int]]: The
                 padded tensor of shape
@@ -143,17 +135,23 @@ class PositionMultiField(RawField):
 
         assert not self.pad_first and not self.truncate_first \
             and not self.fix_length and self.sequential
+
         minibatch = list(minibatch)
-        lengths = [x.size(0) for x in minibatch]
+        lengths = [len(x[0]) for x in minibatch]
         max_len = max(lengths)
-        nfeats = minibatch[0].size(1)
-        feat_dim = minibatch[0].size(2)
-        feats = torch.full((len(minibatch), max_len, nfeats, feat_dim), self.pad_token)
-        for i, (feat, len_) in enumerate(zip(minibatch, lengths)):
-            feats[i, 0:len_, :, :] = feat
+
+        # nfeats = minibatch[0].size(1)
+        # feat_dim = minibatch[0].size(2)
+        # feats = torch.full((len(minibatch), max_len, nfeats, feat_dim), self.pad_token)
+        # for i, (feat, len_) in enumerate(zip(minibatch, lengths)):
+        #     feats[i, 0:len_, :, :] = feat
+
+        padded = []
+        for x in minibatch:
+            padded.append(x + [0] * max(0, max_len - len(x)))
         if self.include_lengths:
-            return feats, lengths
-        return feats
+            return padded, lengths
+        return padded
 
     def numericalize(self, arr, device=None):
         """Turn a batch of examples that use this field into a Variable.
@@ -167,7 +165,7 @@ class PositionMultiField(RawField):
             device (str or torch.device): See `Field.numericalize`.
         """
 
-        assert self.use_vocab is False
+        assert self.use_vocab is True
         if self.include_lengths and not isinstance(arr, tuple):
             raise ValueError("Field has include_lengths set to True, but "
                              "input data is not a tuple of "
@@ -175,13 +173,15 @@ class PositionMultiField(RawField):
         if isinstance(arr, tuple):
             arr, lengths = arr
             lengths = torch.tensor(lengths, dtype=torch.int, device=device)
-        arr = arr.to(device)
+        arr = postprocessing(arr)
+        # if self.postprocessing is not None:
+        #     arr = self.postprocessing(arr, None)
 
-        if self.postprocessing is not None:
-            arr = self.postprocessing(arr, None)
+        arr = torch.tensor(arr, dtype=self.dtype, device=device)
 
         if self.sequential and not self.batch_first:
             arr = arr.permute(1, 0, 2, 3)
+
         if self.sequential:
             arr = arr.contiguous()
 
@@ -201,6 +201,25 @@ class PositionMultiField(RawField):
                 is ordered like ``self.fields``.
         """
         return [f.preprocess(x) for _, f in self.fields]
+
+    def process(self, batch, device=None):
+        """ Process a list of examples to create a torch.Tensor.
+        Pad, numericalize, and postprocess a batch and create a tensor.
+
+        Args:
+            device:
+            batch (list(object)): A list of object from a batch of examples.
+            An object is a list of token positions wher a position is a form of
+            list [d_model, idx1, idx2, idx3 ,...] in which d_model means the length
+            of the position list, "idx1", "idx2", "idx3" are the the indexes that
+            correpsonding value is 1.
+        Returns:
+            torch.autograd.Variable: Processed object given the input
+            and custom postprocessing Pipeline.
+        """
+        padded = self.pad(batch)
+        tensor = self.numericalize(padded, device=device)
+        return tensor
 
     def __getitem__(self, item):
         return self.fields[item]
@@ -225,25 +244,13 @@ def position_fields(**kwargs):
     n_feats = kwargs["n_feats"]
     include_lengths = kwargs["include_lengths"]
     base_name = kwargs["base_name"]
-    pad = kwargs.get("pad", "<blank>")
-    bos = kwargs.get("bos", "<s>")
-    eos = kwargs.get("eos", "</s>")
-    truncate = kwargs.get("truncate", None)
+    pad = kwargs.get("pad", [0])
     fields_ = []
-    feat_delim = u"￨" if n_feats > 0 else None
     for i in range(n_feats + 1):
         name = base_name + "_feat_" + str(i - 1) if i > 0 else base_name
-        tokenize = partial(
-            _feature_tokenize,
-            layer=i,
-            truncate=truncate,
-            feat_delim=feat_delim)
         use_len = i == 0 and include_lengths
-        feat = Field(
-            init_token=bos, eos_token=eos,
-            pad_token=pad, tokenize=tokenize,
-            include_lengths=use_len, sequential=False, use_vocab=False,
-            preprocessing=preprocess, postprocessing=postprocessing)
+        feat = Field(pad_token=pad, include_lengths=use_len, sequential=False,
+                     use_vocab=False, preprocessing=preprocess, postprocessing=postprocessing)
         fields_.append((name, feat))
     assert fields_[0][0] == base_name  # sanity check
     field = PositionMultiField(fields_[0][0], fields_[0][1], fields_[1:])
