@@ -21,7 +21,7 @@ from onmt.inputters.inputter import _build_fields_vocab,\
 
 from functools import partial
 from multiprocessing import Pool
-
+import time
 
 def check_existing_pt_files(opt, corpus_type, ids, existing_fields):
     """ Check if there are existing .pt files to avoid overwriting them """
@@ -331,6 +331,7 @@ def preprocess(opt):
 
     init_logger(opt.log_file)
 
+    start_time = time.time()
     logger.info("Extracting features...")
 
     src_nfeats = count_features(opt.train_src[0]) if opt.data_type == 'text' else 0
@@ -375,6 +376,7 @@ def preprocess(opt):
         build_save_dataset('valid', fields, src_reader, tgt_reader, align_reader, opt,
                            src_pos_reader=src_pos_reader, tgt_pos_reader=tgt_pos_reader)
 
+    logger.info("--- %s seconds ---" % (time.time() - start_time))
 
 def _get_parser():
     parser = ArgumentParser(description='preprocess.py')
@@ -385,10 +387,12 @@ def _get_parser():
 
 
 def main():
-    parser = _get_parser()
 
+
+    parser = _get_parser()
     opt = parser.parse_args()
     preprocess(opt)
+
 
 
 if __name__ == "__main__":

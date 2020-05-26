@@ -32,8 +32,9 @@ def preprocess(data):
     def _tensor(ele, dim=256):
         nums = len(ele) - 1
         index = torch.LongTensor([[0] * nums, ele[1:]])
-        value = torch.FloatTensor([1] * nums)
+        value = torch.IntTensor([1] * nums)
         return torch.sparse.FloatTensor(index, value, torch.Size([1, dim])).to_dense()
+
     d_model = 256
     listData = list(map(lambda x: list(eval(x)), data.split(" ")))
     return torch.cat(list(map(lambda x: _tensor(x, d_model), listData)))
@@ -141,26 +142,35 @@ class PositionMultiField(Field):
                 else just returns the padded tensor.
         """
 
-        assert not self.pad_first and not self.truncate_first \
-               and not self.fix_length and self.sequential
+        assert not self.pad_first and not self.truncate_first and not self.fix_length and self.sequential
 
         minibatch = list(minibatch)
-        lengths = [len(x[0]) for x in minibatch]
-        max_len = max(lengths)
+        dim_x = len(minibatch)
 
-        # nfeats = minibatch[0].size(1)
-        # feat_dim = minibatch[0].size(2)
-        # feats = torch.full((len(minibatch), max_len, nfeats, feat_dim), self.pad_token)
-        # for i, (feat, len_) in enumerate(zip(minibatch, lengths)):
-        #     feats[i, 0:len_, :, :] = feat
+        dim_ys = [x[0].size(0) for x in minibatch]
+        dim_y = max(dim_ys)
+        # dim_zs = [x[0].size(1) for x in minibatch]
+        # dim_z = max(dim_zs)
 
-        padded = []
-        for x in minibatch:
-            x[0].extend([[0, 0] for i in range(max_len - len(x[0]))])
-            padded.append(x)
-        if self.include_lengths:
-            return padded, lengths
-        return padded
+        dim_z = minibatch[0][0].size(1)
+
+        def _cat(tensor):
+            _dim_y = tensor[0].size(0)
+            if _dim_y == dim_y:
+                return tensor[0]
+            nums_cat = dim_y - _dim_y
+            _tensor = tensor + [torch.zeros(1, dim_z, dtype=torch.int)] * nums_cat
+            return torch.cat(_tensor)
+
+        minibatch = list(map(_cat, minibatch))
+
+        reg = torch.cat(minibatch).reshape(dim_x, dim_y, -1)
+
+        # for x in minibatch:
+        #     x[0].extend([[0, 0] for i in range(max_len - len(x[0]))])
+        #     padded.append(x)
+
+        return reg
 
     def postprocess(self, x):
         return [f.postprocessing(x) for _, f in self.fields]
@@ -187,10 +197,9 @@ class PositionMultiField(Field):
             lengths = torch.tensor(lengths, dtype=torch.int, device=device)
         # arr = postprocessing(arr)
 
-        arr = self.postprocess(arr)
+        # arr = self.postprocess(arr)
 
-        arr = torch.tensor(arr, dtype=self.dtype, device=device)
-
+        # arr = torch.tensor(arr, dtype=self.dtype, device=device)
         # if self.sequential and not self.batch_first:
         #     arr = arr.permute(1, 0, 2, 3)
 

@@ -204,7 +204,6 @@ def _get_parser():
 
 def main():
     parser = _get_parser()
-
     opt = parser.parse_args()
     train(opt)
 
