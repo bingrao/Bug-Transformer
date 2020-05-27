@@ -16,10 +16,10 @@ from onmt.inputters.datareader_base import DataReaderBase
 
 str2reader = {
     "text": TextDataReader, "img": ImageDataReader, "audio": AudioDataReader,
-    "vec": VecDataReader, "position": PositionDataReader}
+    "vec": VecDataReader, "position": PositionDataReader, "code": TextDataReader}
 str2sortkey = {
     'text': text_sort_key, 'img': img_sort_key, 'audio': audio_sort_key,
-    'vec': vec_sort_key, "position": position_sort_key}
+    'vec': vec_sort_key, "position": position_sort_key, 'code': text_sort_key}
 
 
 __all__ = ['Dataset', 'load_old_vocab', 'get_fields', 'DataReaderBase',

@@ -12,6 +12,8 @@ save_data: examples/learning_fix/data/small/small
 src_seq_length: 46680
 tgt_seq_length: 46680
 src_seq_length_trunc: 400
-tgt_seq_length_trunc: 100
+tgt_seq_length_trunc: 200
 num_threads: 10
 overwrite: True
+share_vocab: True
+data_type: "code"

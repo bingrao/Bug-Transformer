@@ -301,11 +301,9 @@ def position_fields(**kwargs):
             truncate=truncate,
             feat_delim=feat_delim)
         use_len = i == 0 and include_lengths
-        feat = Field(
-            init_token=bos, eos_token=eos,
-            pad_token=pad, tokenize=tokenize,
-            include_lengths=use_len, use_vocab=False, sequential=False,
-            preprocessing=partial(preprocess), postprocessing=partial(postprocessing))
+        feat = Field(dtype=torch.int, init_token=bos, eos_token=eos, pad_token=pad, tokenize=tokenize,
+                     include_lengths=use_len, use_vocab=False, sequential=False,
+                     preprocessing=partial(preprocess), postprocessing=partial(postprocessing))
         fields_.append((name, feat))
     assert fields_[0][0] == base_name  # sanity check
     field = PositionMultiField(fields_[0][0], fields_[0][1], fields_[1:], pos_vec_size)

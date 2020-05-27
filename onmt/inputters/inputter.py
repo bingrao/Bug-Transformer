@@ -139,7 +139,7 @@ def get_fields(
         the dataset example attributes.
     """
 
-    assert src_data_type in ['text', 'img', 'audio', 'vec'], \
+    assert src_data_type in ['text', 'img', 'audio', 'vec', 'code'], \
         "Data type not implemented"
     assert not dynamic_dict or src_data_type == 'text', \
         'it is not possible to use dynamic_dict with non-text input'
@@ -149,7 +149,8 @@ def get_fields(
                       "img": image_fields,
                       "audio": audio_fields,
                       "vec": vec_fields,
-                      "position": position_fields}
+                      "position": position_fields,
+                      "code": text_fields}
 
     src_field_kwargs = {"n_feats": n_src_feats,
                         "include_lengths": True,

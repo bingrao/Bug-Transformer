@@ -9,3 +9,5 @@ src_seq_length_trunc: 400
 tgt_seq_length_trunc: 100
 num_threads: 10
 overwrite: True
+share_vocab: True
+data_type: "code"
