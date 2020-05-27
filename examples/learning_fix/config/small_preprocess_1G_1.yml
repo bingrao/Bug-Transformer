@@ -10,4 +10,4 @@ tgt_seq_length_trunc: 200
 num_threads: 10
 overwrite: True
 share_vocab: True
-data_type: "code"
+pos_vec_size: 256

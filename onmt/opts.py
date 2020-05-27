@@ -235,7 +235,7 @@ def preprocess_opts(parser):
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text",
               help="Type of the source input. "
-                   "Options are [text|img|audio|vec|code].")
+                   "Options are [text|img|audio|vec].")
 
     group.add('--train_src', '-train_src', required=True, nargs='+',
               help="Path(s) to the training source data")
@@ -661,7 +661,7 @@ def translate_opts(parser):
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text",
-              help="Type of the source input. Options: [text|img|code].")
+              help="Type of the source input. Options: [text|img].")
 
     group.add('--src', '-src', required=True,
               help="Source sequence to decode (one line per "

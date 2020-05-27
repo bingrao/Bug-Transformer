@@ -40,7 +40,7 @@ def preprocess(arr):
     Returns: a 2D dimention (seq_len, d_model=215) to represent positions
     """
     data, vector_size = arr
-
+    
     def _tensor(ele, dim=256):
         nums = len(ele) - 1
         index = torch.LongTensor([[0] * nums, ele[1:]])
@@ -301,9 +301,11 @@ def position_fields(**kwargs):
             truncate=truncate,
             feat_delim=feat_delim)
         use_len = i == 0 and include_lengths
-        feat = Field(dtype=torch.int, init_token=bos, eos_token=eos, pad_token=pad, tokenize=tokenize,
-                     include_lengths=use_len, use_vocab=False, sequential=False,
-                     preprocessing=partial(preprocess), postprocessing=partial(postprocessing))
+        feat = Field(
+            init_token=bos, eos_token=eos,
+            pad_token=pad, tokenize=tokenize, dtype=torch.int,
+            include_lengths=use_len, use_vocab=False, sequential=False,
+            preprocessing=partial(preprocess), postprocessing=partial(postprocessing))
         fields_.append((name, feat))
     assert fields_[0][0] == base_name  # sanity check
     field = PositionMultiField(fields_[0][0], fields_[0][1], fields_[1:], pos_vec_size)

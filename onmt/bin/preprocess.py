@@ -14,15 +14,14 @@ from onmt.utils.misc import split_corpus
 import onmt.inputters as inputters
 import onmt.opts as opts
 from onmt.utils.parse import ArgumentParser
-from onmt.inputters.inputter import _build_fields_vocab, \
-    _load_vocab, \
-    old_style_vocab, \
-    load_old_vocab
+from onmt.inputters.inputter import _build_fields_vocab,\
+                                    _load_vocab, \
+                                    old_style_vocab, \
+                                    load_old_vocab
 
 from functools import partial
 from multiprocessing import Pool
 import time
-
 
 def check_existing_pt_files(opt, corpus_type, ids, existing_fields):
     """ Check if there are existing .pt files to avoid overwriting them """
@@ -54,8 +53,8 @@ def process_one_shard(corpus_params, params):
     :param params:
     :return:
     """
-    corpus_type, fields, src_reader, tgt_reader, align_reader, opt, \
-    existing_fields, src_vocab, tgt_vocab, src_pos_reader, tgt_pos_reader = corpus_params
+    corpus_type, fields, src_reader, tgt_reader, align_reader, opt,\
+         existing_fields, src_vocab, tgt_vocab, src_pos_reader, tgt_pos_reader = corpus_params
     i, (src_shard, tgt_shard, align_shard, maybe_id, filter_pred, src_pos_shard, tgt_pos_shard) = params
     # create one counter per shard
     sub_sub_counter = defaultdict(Counter)
@@ -115,9 +114,11 @@ def process_one_shard(corpus_params, params):
         shard_base = corpus_type + "_" + maybe_id
     else:
         shard_base = corpus_type
-    data_path = "{:s}.{:s}.{:d}.pt".format(opt.save_data, shard_base, i)
+    data_path = "{:s}.{:s}.{:d}.pt".\
+        format(opt.save_data, shard_base, i)
 
-    logger.info(" * saving %sth %s data shard to %s." % (i, shard_base, data_path))
+    logger.info(" * saving %sth %s data shard to %s."
+                % (i, shard_base, data_path))
 
     dataset.save(data_path)
 
@@ -172,11 +173,13 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
         tgts_pos = opt.train_tgt_pos
         ids = [None]
         aligns = [opt.valid_align]
-
+        
     # Check if exist src_vocab, tgt_vocab and fields provided by users
-    src_vocab, tgt_vocab, existing_fields = maybe_load_vocab(corpus_type, counters, opt)
+    src_vocab, tgt_vocab, existing_fields = maybe_load_vocab(
+        corpus_type, counters, opt)
 
-    existing_shards = check_existing_pt_files(opt, corpus_type, ids, existing_fields)
+    existing_shards = check_existing_pt_files(
+        opt, corpus_type, ids, existing_fields)
 
     # every corpus has shards, no new one
     if existing_shards == ids and not opt.overwrite:
@@ -194,7 +197,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
                                    .format(maybe_id))
                 else:
                     if corpus_type == "train":
-                        assert existing_fields is not None, \
+                        assert existing_fields is not None,\
                             ("A 'vocab.pt' file should be passed to "
                              "`-src_vocab` when adding a corpus to "
                              "a set of already existing shards.")
@@ -217,8 +220,9 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
             for i, (ss, ts, a_s) in enumerate(zip(src_shards, tgt_shards, align_shards)):
                 yield i, (ss, ts, a_s, maybe_id, filter_pred, None, None)
 
+
     def shard_iterator_with_position(srcs, tgts, ids, aligns, existing_shards,
-                                     existing_fields, corpus_type, opt, srcs_pos, tgts_pos):
+                       existing_fields, corpus_type, opt, srcs_pos, tgts_pos):
         """
         Builds a single iterator yielding every shard of every corpus.
         """
@@ -229,7 +233,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
                                    .format(maybe_id))
                 else:
                     if corpus_type == "train":
-                        assert existing_fields is not None, \
+                        assert existing_fields is not None,\
                             ("A 'vocab.pt' file should be passed to "
                              "`-src_vocab` when adding a corpus to "
                              "a set of already existing shards.")
@@ -295,7 +299,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
         if fields.get("corpus_id", False):
             fields["corpus_id"].vocab = new_fields["corpus_id"].vocab_cls(
                 counters["corpus_id"])
-        logger.info(f"Building & Saving vocabulary {vocab_path} ...")
+
         torch.save(fields, vocab_path)
 
 
@@ -334,11 +338,11 @@ def preprocess(opt):
     tgt_nfeats = count_features(opt.train_tgt[0])  # tgt always text so far
     if len(opt.train_src) > 1 and opt.data_type == 'text':
         for src, tgt in zip(opt.train_src[1:], opt.train_tgt[1:]):
-            assert src_nfeats == count_features(src), \
-                "%s seems to mismatch features of " \
+            assert src_nfeats == count_features(src),\
+                "%s seems to mismatch features of "\
                 "the other source datasets" % src
-            assert tgt_nfeats == count_features(tgt), \
-                "%s seems to mismatch features of " \
+            assert tgt_nfeats == count_features(tgt),\
+                "%s seems to mismatch features of "\
                 "the other target datasets" % tgt
     logger.info(" * number of source features: %d." % src_nfeats)
     logger.info(" * number of target features: %d." % tgt_nfeats)
@@ -354,11 +358,11 @@ def preprocess(opt):
         tgt_truncate=opt.tgt_seq_length_trunc, opt=opt)
 
     src_reader = inputters.str2reader[opt.data_type].from_opt(opt)
-    src_pos_reader = inputters.str2reader[opt.data_type].from_opt(opt) \
+    src_pos_reader = inputters.str2reader["text"].from_opt(opt) \
         if opt.train_src_pos is not None or opt.valid_src_pos is not None else None
 
     tgt_reader = inputters.str2reader["text"].from_opt(opt)
-    tgt_pos_reader = inputters.str2reader[opt.data_type].from_opt(opt) \
+    tgt_pos_reader = inputters.str2reader["text"].from_opt(opt) \
         if opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None else None
 
     align_reader = inputters.str2reader["text"].from_opt(opt)
@@ -374,7 +378,6 @@ def preprocess(opt):
 
     logger.info("--- %s seconds ---" % (time.time() - start_time))
 
-
 def _get_parser():
     parser = ArgumentParser(description='preprocess.py')
 
@@ -384,9 +387,12 @@ def _get_parser():
 
 
 def main():
+
+
     parser = _get_parser()
     opt = parser.parse_args()
     preprocess(opt)
+
 
 
 if __name__ == "__main__":
