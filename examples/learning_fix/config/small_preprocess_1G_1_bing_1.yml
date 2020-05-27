@@ -17,3 +17,4 @@ num_threads: 10
 overwrite: True
 share_vocab: True
 pos_vec_size: 256
+data_type: "code"

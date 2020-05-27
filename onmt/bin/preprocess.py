@@ -114,11 +114,9 @@ def process_one_shard(corpus_params, params):
         shard_base = corpus_type + "_" + maybe_id
     else:
         shard_base = corpus_type
-    data_path = "{:s}.{:s}.{:d}.pt".\
-        format(opt.save_data, shard_base, i)
+    data_path = "{:s}.{:s}.{:d}.pt".format(opt.save_data, shard_base, i)
 
-    logger.info(" * saving %sth %s data shard to %s."
-                % (i, shard_base, data_path))
+    logger.info(" * saving %sth %s data shard to %s." % (i, shard_base, data_path))
 
     dataset.save(data_path)
 
@@ -193,8 +191,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
         for src, tgt, maybe_id, maybe_align in zip(srcs, tgts, ids, aligns):
             if maybe_id in existing_shards:
                 if opt.overwrite:
-                    logger.warning("Overwrite shards for corpus {}"
-                                   .format(maybe_id))
+                    logger.warning("Overwrite shards for corpus {}".format(maybe_id))
                 else:
                     if corpus_type == "train":
                         assert existing_fields is not None,\
@@ -208,7 +205,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
             if (corpus_type == "train" or opt.filter_valid) and tgt is not None:
                 filter_pred = partial(
                     inputters.filter_example,
-                    use_src_len=opt.data_type == "text",
+                    use_src_len=opt.data_type == "text" or opt.data_type == "code",
                     max_src_len=opt.src_seq_length,
                     max_tgt_len=opt.tgt_seq_length)
             else:
@@ -334,9 +331,9 @@ def preprocess(opt):
     start_time = time.time()
     logger.info("Extracting features...")
 
-    src_nfeats = count_features(opt.train_src[0]) if opt.data_type == 'text' else 0
+    src_nfeats = count_features(opt.train_src[0]) if opt.data_type == 'text' or opt.data_type == 'code' else 0
     tgt_nfeats = count_features(opt.train_tgt[0])  # tgt always text so far
-    if len(opt.train_src) > 1 and opt.data_type == 'text':
+    if len(opt.train_src) > 1 and (opt.data_type == 'text' or opt.data_type == 'code'):
         for src, tgt in zip(opt.train_src[1:], opt.train_tgt[1:]):
             assert src_nfeats == count_features(src),\
                 "%s seems to mismatch features of "\
@@ -358,12 +355,12 @@ def preprocess(opt):
         tgt_truncate=opt.tgt_seq_length_trunc, opt=opt)
 
     src_reader = inputters.str2reader[opt.data_type].from_opt(opt)
-    src_pos_reader = inputters.str2reader["text"].from_opt(opt) \
-        if opt.train_src_pos is not None or opt.valid_src_pos is not None else None
+    src_pos_reader = inputters.str2reader[opt.data_type].from_opt(opt) \
+        if opt.data_type == "code" and (opt.train_src_pos is not None or opt.valid_src_pos is not None) else None
 
     tgt_reader = inputters.str2reader["text"].from_opt(opt)
-    tgt_pos_reader = inputters.str2reader["text"].from_opt(opt) \
-        if opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None else None
+    tgt_pos_reader = inputters.str2reader[opt.data_type].from_opt(opt) \
+        if opt.data_type == "code" and (opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None) else None
 
     align_reader = inputters.str2reader["text"].from_opt(opt)
 

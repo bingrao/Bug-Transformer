@@ -139,9 +139,9 @@ def get_fields(
         the dataset example attributes.
     """
 
-    assert src_data_type in ['text', 'img', 'audio', 'vec'], \
+    assert src_data_type in ['text', 'img', 'audio', 'vec', 'code'], \
         "Data type not implemented"
-    assert not dynamic_dict or src_data_type == 'text', \
+    assert not dynamic_dict or (src_data_type == 'text' or src_data_type == 'code'), \
         'it is not possible to use dynamic_dict with non-text input'
     fields = {}
 
@@ -149,7 +149,8 @@ def get_fields(
                       "img": image_fields,
                       "audio": audio_fields,
                       "vec": vec_fields,
-                      "position": position_fields}
+                      "position": position_fields,
+                      "code": text_fields}
 
     src_field_kwargs = {"n_feats": n_src_feats,
                         "include_lengths": True,
@@ -159,7 +160,7 @@ def get_fields(
 
     fields["src"] = fields_getters[src_data_type](**src_field_kwargs)
 
-    if opt is not None and (opt.train_src_pos is not None or opt.valid_src_pos is not None):
+    if opt is not None and src_data_type == 'code' and (opt.train_src_pos is not None or opt.valid_src_pos is not None):
         src_pos_field_kwargs = {"n_feats": n_src_feats,
                                 "include_lengths": True,
                                 "pad": pad, "bos": None, "eos": None,
@@ -173,7 +174,11 @@ def get_fields(
                         "pad": pad, "bos": bos, "eos": eos,
                         "truncate": tgt_truncate,
                         "base_name": "tgt"}
-    fields["tgt"] = fields_getters["text"](**tgt_field_kwargs)
+
+    if src_data_type == 'code':
+        fields["tgt"] = fields_getters["code"](**tgt_field_kwargs)
+    else:
+        fields["tgt"] = fields_getters["text"](**tgt_field_kwargs)
 
     if opt is not None and (opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None):
         tgt_pos_field_kwargs = {"n_feats": n_tgt_feats,
@@ -256,7 +261,7 @@ def load_old_vocab(vocab, data_type="text", dynamic_dict=False):
         # doesn't change structure - don't return early.
         fields = vocab
         for base_name, vals in fields.items():
-            if ((base_name == 'src' and data_type == 'text') or
+            if ((base_name == 'src' and (data_type == 'text' or data_type == 'code')) or
                     base_name == 'tgt'):
                 assert not isinstance(vals[0][1], TextMultiField)
                 fields[base_name] = [(base_name, TextMultiField(
@@ -412,10 +417,9 @@ def _build_fields_vocab(fields, counters, data_type, share_vocab,
         size_multiple=vocab_size_multiple if not share_vocab else 1)
 
     if fields.get("corpus_id", False):
-        fields["corpus_id"].vocab = fields["corpus_id"].vocab_cls(
-            counters["corpus_id"])
+        fields["corpus_id"].vocab = fields["corpus_id"].vocab_cls(counters["corpus_id"])
 
-    if data_type == 'text':
+    if data_type == 'text' or data_type == 'code':
         src_multifield = fields["src"]
         _build_fv_from_multifield(
             src_multifield,
