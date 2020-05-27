@@ -28,7 +28,7 @@ def postprocessing(data, arg=None):
     return arr
 
 
-def preprocess(data):
+def preprocess(arr):
     """
 
     Args:
@@ -39,15 +39,16 @@ def preprocess(data):
 
     Returns: a 2D dimention (seq_len, d_model=215) to represent positions
     """
+    data, vector_size = arr
+
     def _tensor(ele, dim=256):
         nums = len(ele) - 1
         index = torch.LongTensor([[0] * nums, ele[1:]])
         value = torch.IntTensor([1] * nums)
         return torch.sparse.FloatTensor(index, value, torch.Size([1, dim])).to_dense()
 
-    d_model = 256
     listdata = list(map(lambda x: list(eval(x)), data.split(" ")))
-    return torch.cat(list(map(lambda x: _tensor(x, d_model), listdata)))
+    return torch.cat(list(map(lambda x: _tensor(x, vector_size), listdata)))
 
 
 class PositionDataReader(DataReaderBase):
@@ -130,9 +131,10 @@ class PositionMultiField(Field):
             ``feats_fields`` in alphabetical order.
     """
 
-    def __init__(self, base_name, base_field, feats_fields):
+    def __init__(self, base_name, base_field, feats_fields, pos_vec_size=256):
         super(PositionMultiField, self).__init__()
         self.fields = [(base_name, base_field)]
+        self.pos_vec_size = pos_vec_size
         for name, ff in sorted(feats_fields, key=lambda kv: kv[0]):
             self.fields.append((name, ff))
 
@@ -240,7 +242,7 @@ class PositionMultiField(Field):
                 lists of tokens/feature tags for the sentence. The output
                 is ordered like ``self.fields``.
         """
-        return [f.preprocess(x) for _, f in self.fields]
+        return [f.preprocess((x, self.pos_vec_size)) for _, f in self.fields]
 
     def process(self, batch, device=None):
         """ Process a list of examples to create a torch.Tensor.
@@ -287,6 +289,7 @@ def position_fields(**kwargs):
     pad = kwargs.get("pad", "<blank>")
     bos = kwargs.get("bos", "<s>")
     eos = kwargs.get("eos", "</s>")
+    pos_vec_size = kwargs.get("pos_vec_size", 256)
     truncate = kwargs.get("truncate", None)
     fields_ = []
     feat_delim = u"￨" if n_feats > 0 else None
@@ -305,5 +308,5 @@ def position_fields(**kwargs):
             preprocessing=partial(preprocess), postprocessing=partial(postprocessing))
         fields_.append((name, feat))
     assert fields_[0][0] == base_name  # sanity check
-    field = PositionMultiField(fields_[0][0], fields_[0][1], fields_[1:])
+    field = PositionMultiField(fields_[0][0], fields_[0][1], fields_[1:], pos_vec_size)
     return field

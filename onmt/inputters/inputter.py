@@ -162,8 +162,8 @@ def get_fields(
     if opt is not None and (opt.train_src_pos is not None or opt.valid_src_pos is not None):
         src_pos_field_kwargs = {"n_feats": n_src_feats,
                                 "include_lengths": True,
-                                "pad": pad, "bos": None,
-                                "eos": None,
+                                "pad": pad, "bos": None, "eos": None,
+                                "pos_vec_size": opt.pos_vec_size,
                                 "truncate": src_truncate,
                                 "base_name": "src_pos"}
         fields["src_pos"] = fields_getters["position"](**src_pos_field_kwargs)
@@ -180,6 +180,7 @@ def get_fields(
                                 "include_lengths": False,
                                 "pad": pad, "bos": bos, "eos": eos,
                                 "truncate": tgt_truncate,
+                                "pos_vec_size": opt.pos_vec_size,
                                 "base_name": "tgt_pos"}
         fields["tgt_pos"] = fields_getters["position"](**tgt_pos_field_kwargs)
 

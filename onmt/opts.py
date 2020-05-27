@@ -270,6 +270,10 @@ def preprocess_opts(parser):
     group.add('--save_data', '-save_data', required=True,
               help="Output file for the prepared data")
 
+    group.add('--pos_vec_size', '-pos_vec_size', type=int, default=256,
+              help="The position vector dimension size, which must match"
+                   "with the dimension of word vector size in train phase")
+
     group.add('--max_shard_size', '-max_shard_size', type=int, default=0,
               help="""Deprecated use shard_size instead""")
 
