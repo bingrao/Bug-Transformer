@@ -140,7 +140,7 @@ class PositionMultiField(Field):
     def base_field(self):
         return self.fields[0][1]
 
-    def pad(self, minibatch):
+    def pad(self, minibatch, device=None):
         """Pad a batch of examples to the length of the longest example.
         Args:
 
@@ -152,7 +152,9 @@ class PositionMultiField(Field):
                 else just returns the padded tensor.
         """
 
-        assert not self.pad_first and not self.truncate_first and not self.fix_length and self.sequential
+        # assert not self.base_field.pad_first and \
+        #        not self.base_field.truncate_first and \
+        #        not self.base_field.fix_length and self.base_field.sequential
 
         minibatch = list(minibatch)
         dim_x = len(minibatch)
@@ -163,18 +165,25 @@ class PositionMultiField(Field):
         # dim_z = max(dim_zs)
 
         dim_z = minibatch[0][0].size(1)
+        ini = [] if self.base_field.init_token is None else [torch.zeros(1, dim_z, dtype=torch.int)]
+        eos = [] if self.base_field.eos_token is None else [torch.ones(1, dim_z, dtype=torch.int)]
 
         def _cat(tensor):
             _dim_y = tensor[0].size(0)
-            if _dim_y == dim_y:
-                return tensor[0]
-            nums_cat = dim_y - _dim_y
-            _tensor = tensor + [torch.zeros(1, dim_z, dtype=torch.int)] * nums_cat
-            return torch.cat(_tensor)
+            _tensor = ini + tensor + eos
+            pad = [torch.ones(1, dim_z, dtype=torch.int)]*(dim_y - _dim_y)
+            if self.base_field.pad_first:
+                _tensor = pad + _tensor
+            else:
+                _tensor = _tensor + pad
+
+            return torch.cat(_tensor).to(device)
 
         minibatch = list(map(_cat, minibatch))
 
-        reg = torch.cat(minibatch).reshape(dim_x, dim_y, -1)
+        dim_y = dim_y + len(ini) + len(eos)
+
+        reg = torch.cat(minibatch).reshape(dim_x, dim_y, -1).permute(1, 0, -1)
 
         # for x in minibatch:
         #     x[0].extend([[0, 0] for i in range(max_len - len(x[0]))])
@@ -248,7 +257,7 @@ class PositionMultiField(Field):
             torch.autograd.Variable: Processed object given the input
             and custom postprocessing Pipeline.
         """
-        padded = self.pad(batch)
+        padded = self.pad(batch, device=device)
         tensor = self.numericalize(padded, device=device)
         return tensor
 
@@ -275,13 +284,25 @@ def position_fields(**kwargs):
     n_feats = kwargs["n_feats"]
     include_lengths = kwargs["include_lengths"]
     base_name = kwargs["base_name"]
-    pad = kwargs.get("pad", [0])
+    pad = kwargs.get("pad", "<blank>")
+    bos = kwargs.get("bos", "<s>")
+    eos = kwargs.get("eos", "</s>")
+    truncate = kwargs.get("truncate", None)
     fields_ = []
+    feat_delim = u"￨" if n_feats > 0 else None
     for i in range(n_feats + 1):
         name = base_name + "_feat_" + str(i - 1) if i > 0 else base_name
+        tokenize = partial(
+            _feature_tokenize,
+            layer=i,
+            truncate=truncate,
+            feat_delim=feat_delim)
         use_len = i == 0 and include_lengths
-        feat = Field(pad_token=pad, include_lengths=use_len, sequential=False,
-                     use_vocab=False, preprocessing=partial(preprocess), postprocessing=partial(postprocessing))
+        feat = Field(
+            init_token=bos, eos_token=eos,
+            pad_token=pad, tokenize=tokenize,
+            include_lengths=use_len, use_vocab=False, sequential=False,
+            preprocessing=partial(preprocess), postprocessing=partial(postprocessing))
         fields_.append((name, feat))
     assert fields_[0][0] == base_name  # sanity check
     field = PositionMultiField(fields_[0][0], fields_[0][1], fields_[1:])

@@ -89,7 +89,8 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
                            earlystopper=earlystopper,
                            dropout=dropout,
                            dropout_steps=dropout_steps,
-                           source_noise=source_noise)
+                           source_noise=source_noise,
+                           opt=opt)
     return trainer
 
 
@@ -127,7 +128,8 @@ class Trainer(object):
                  report_manager=None, with_align=False, model_saver=None,
                  average_decay=0, average_every=1, model_dtype='fp32',
                  earlystopper=None, dropout=[0.3], dropout_steps=[0],
-                 source_noise=None):
+                 source_noise=None,
+                 opt=None):
         # Basic attributes.
         self.model = model
         self.train_loss = train_loss
@@ -153,6 +155,8 @@ class Trainer(object):
         self.dropout = dropout
         self.dropout_steps = dropout_steps
         self.source_noise = source_noise
+        self.position_encoding = opt.position_encoding
+        self.position_style = opt.position_style
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -204,7 +208,7 @@ class Trainer(object):
             self.moving_average = copy_params
         else:
             average_decay = max(self.average_decay,
-                                1 - (step + 1)/(step + 10))
+                                1 - (step + 1) / (step + 10))
             for (i, avg), cpt in zip(enumerate(self.moving_average),
                                      self.model.parameters()):
                 self.moving_average[i] = \
@@ -291,8 +295,8 @@ class Trainer(object):
                         break
 
             if (self.model_saver is not None
-                and (save_checkpoint_steps != 0
-                     and step % save_checkpoint_steps == 0)):
+                    and (save_checkpoint_steps != 0
+                         and step % save_checkpoint_steps == 0)):
                 self.model_saver.save(step, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
@@ -327,7 +331,7 @@ class Trainer(object):
 
             for batch in valid_iter:
                 src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                                   else (batch.src, None)
+                    else (batch.src, None)
                 tgt = batch.tgt
 
                 # F-prop through the model.
@@ -371,8 +375,15 @@ class Trainer(object):
 
             tgt_outer = batch.tgt
 
+            if self.position_encoding and self.position_style != "index":
+                src_pos = batch.src_pos
+                tgt_pos = batch.tgt_pos
+            else:
+                src_pos = None
+                tgt_pos = None
+
             bptt = False
-            for j in range(0, target_size-1, trunc_size):
+            for j in range(0, target_size - 1, trunc_size):
                 # 1. Create truncated target.
                 tgt = tgt_outer[j: j + trunc_size]
 
@@ -381,7 +392,7 @@ class Trainer(object):
                     self.optim.zero_grad()
 
                 outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
-                                            with_align=self.with_align)
+                                            with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
                 bptt = True
 
                 # 3. Compute loss.

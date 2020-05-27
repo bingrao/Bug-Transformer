@@ -43,6 +43,7 @@ class NMTModel(nn.Module):
             :param src_pos:
         """
         dec_in = tgt[:-1]  # exclude last target from inputs
+        tgt_pos = tgt_pos[:-1] if tgt_pos is not None else tgt_pos
 
         enc_state, memory_bank, lengths = self.encoder(src, lengths, position=src_pos)
 

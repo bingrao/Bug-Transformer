@@ -10,8 +10,8 @@ report_every: 4000
 
 decoder_type: transformer
 encoder_type: transformer
-word_vec_size: 128
-rnn_size: 128
+word_vec_size: 256
+rnn_size: 256
 layers: 6
 transformer_ff: 1024
 heads: 8
@@ -21,7 +21,7 @@ optim: adam
 adam_beta1: 0.9
 adam_beta2: 0.998
 decay_method: noam
-learning_rate: 2.0
+learning_rate: 0.001
 max_grad_norm: 0.0
 
 batch_size: 4096
@@ -35,6 +35,7 @@ max_generator_batches: 2
 param_init: 0.0
 param_init_glorot: 'true'
 position_encoding: 'true'
+position_style: 'tree'
 
 world_size: 1
 gpu_ranks:

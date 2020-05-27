@@ -195,8 +195,8 @@ class Embeddings(nn.Module):
             in_dim = sum(emb_dims)
             mlp = nn.Sequential(nn.Linear(in_dim, word_vec_size), nn.ReLU())
             self.make_embedding.add_module('mlp', mlp)
-
-        if position_encoding:
+        self.position_encoding = position_encoding
+        if self.position_encoding:
             self.pe = PositionalEncoding(dropout, self.embedding_size)
             if self.opt.position_style == "index":
                 self.make_embedding.add_module('pe', self.pe)
@@ -280,8 +280,8 @@ class Embeddings(nn.Module):
                         source = module(source)
             else:
                 #TODO
-                source = self.make_embedding(source, step=step)
-                source = source + Variable(position, requires_grad=False)
+                source = self.make_embedding(source)
+                source = source + Variable(position, requires_grad=False)  # Step
 
         else:
             source = self.make_embedding(source)
@@ -291,4 +291,3 @@ class Embeddings(nn.Module):
     def update_dropout(self, dropout):
         if self.position_encoding:
             self.pe.dropout.p = dropout
-            # self._modules['make_embedding'][1].dropout.p = dropout
