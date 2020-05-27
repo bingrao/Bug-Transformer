@@ -29,6 +29,16 @@ def postprocessing(data, arg=None):
 
 
 def preprocess(data):
+    """
+
+    Args:
+        data is a list of token positions wher a position is a form of
+            list [d_model, idx1, idx2, idx3 ,...] in which d_model means the length
+            of the position list, "idx1", "idx2", "idx3" are the the indexes that
+            correpsonding value is 1.
+
+    Returns: a 2D dimention (seq_len, d_model=215) to represent positions
+    """
     def _tensor(ele, dim=256):
         nums = len(ele) - 1
         index = torch.LongTensor([[0] * nums, ele[1:]])
@@ -36,8 +46,8 @@ def preprocess(data):
         return torch.sparse.FloatTensor(index, value, torch.Size([1, dim])).to_dense()
 
     d_model = 256
-    listData = list(map(lambda x: list(eval(x)), data.split(" ")))
-    return torch.cat(list(map(lambda x: _tensor(x, d_model), listData)))
+    listdata = list(map(lambda x: list(eval(x)), data.split(" ")))
+    return torch.cat(list(map(lambda x: _tensor(x, d_model), listdata)))
 
 
 class PositionDataReader(DataReaderBase):
