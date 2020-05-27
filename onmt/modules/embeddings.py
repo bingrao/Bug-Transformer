@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from onmt.modules.util_class import Elementwise
-
+from torch.autograd import Variable
 
 class PositionalEncoding(nn.Module):
     """Sinusoidal positional encoding for non-recurrent neural networks.
@@ -142,6 +142,8 @@ class Embeddings(nn.Module):
         self._validate_args(feat_merge, feat_vocab_sizes, feat_vec_exponent,
                             feat_vec_size, feat_padding_idx)
 
+        self.opt = opt
+
         if feat_padding_idx is None:
             feat_padding_idx = []
         self.word_padding_idx = word_padding_idx
@@ -194,12 +196,10 @@ class Embeddings(nn.Module):
             mlp = nn.Sequential(nn.Linear(in_dim, word_vec_size), nn.ReLU())
             self.make_embedding.add_module('mlp', mlp)
 
-        self.position_encoding = position_encoding
-
-        if self.position_encoding:
-            # pe = PositionalEncoding(dropout, self.embedding_size)
-            # self.make_embedding.add_module('pe', pe)
+        if position_encoding:
             self.pe = PositionalEncoding(dropout, self.embedding_size)
+            if self.opt.position_style == "index":
+                self.make_embedding.add_module('pe', self.pe)
 
         if fix_word_vecs:
             self.word_lut.weight.requires_grad = False
@@ -259,24 +259,30 @@ class Embeddings(nn.Module):
             else:
                 self.word_lut.weight.data.copy_(pretrained)
 
-    def forward(self, source, step=None):
+    def forward(self, source, step=None, position=None):
         """Computes the embeddings for words and features.
 
         Args:
             source (LongTensor): index tensor ``(len, batch, nfeat)``
+            :param step:
+            :param position:
 
         Returns:
             FloatTensor: Word embeddings ``(len, batch, embedding_size)``
         """
 
         if self.position_encoding:
-            source = self.make_embedding(source)
-            source = self.pe(source, step=step)
-            # for i, module in enumerate(self.make_embedding._modules.values()):
-            #     if i == len(self.make_embedding._modules.values()) - 1:
-            #         source = module(source, step=step)
-            #     else:
-            #         source = module(source)
+            if self.opt.position_style == "index":
+                for i, module in enumerate(self.make_embedding._modules.values()):
+                    if i == len(self.make_embedding._modules.values()) - 1:
+                        source = module(source, step=step)
+                    else:
+                        source = module(source)
+            else:
+                #TODO
+                source = self.make_embedding(source, step=step)
+                source = source + Variable(position, requires_grad=False)
+
         else:
             source = self.make_embedding(source)
 

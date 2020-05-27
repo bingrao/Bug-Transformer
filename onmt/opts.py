@@ -44,6 +44,10 @@ def model_opts(parser):
               help="Use a sin to mark relative words positions. "
                    "Necessary for non-RNN style models.")
 
+    group.add('--position_style', '-position_style', type=str, default='index',
+              choices=['index', 'tree', 'path'], help="Use a sin to mark relative words positions. "
+                                                      "Necessary for non-RNN style models.")
+
     group = parser.add_argument_group('Model-Embedding Features')
     group.add('--feat_merge', '-feat_merge', type=str, default='concat',
               choices=['concat', 'sum', 'mlp'],
