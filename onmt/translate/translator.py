@@ -230,7 +230,11 @@ class Translator(object):
         """
 
         src_reader = inputters.str2reader[opt.data_type].from_opt(opt)
-        tgt_reader = inputters.str2reader["text"].from_opt(opt)
+
+        if opt.data_type == "code":
+            tgt_reader = inputters.str2reader["code"].from_opt(opt)
+        else:
+            tgt_reader = inputters.str2reader["text"].from_opt(opt)
         return cls(
             model,
             fields,
@@ -390,7 +394,7 @@ class Translator(object):
                     preds = trans.pred_sents[0]
                     preds.append('</s>')
                     attns = trans.attns[0].tolist()
-                    if self.data_type == 'text':
+                    if self.data_type == 'text' or self.data_type == 'code':
                         srcs = trans.src_raw
                     else:
                         srcs = [str(item) for item in range(len(attns[0]))]
@@ -403,7 +407,7 @@ class Translator(object):
                 if align_debug:
                     tgts = trans.pred_sents[0]
                     align = trans.word_aligns[0].tolist()
-                    if self.data_type == 'text':
+                    if self.data_type == 'text' or self.data_type == 'code':
                         srcs = trans.src_raw
                     else:
                         srcs = [str(item) for item in range(len(align[0]))]
