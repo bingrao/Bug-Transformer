@@ -8,7 +8,7 @@ import glob
 import gc
 import torch
 from collections import Counter, defaultdict
-from tools.statistics import histogram
+from onmt.utils.statistics import histogram
 
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import split_corpus
@@ -23,7 +23,7 @@ from onmt.inputters.inputter import _build_fields_vocab,\
 from functools import partial
 from multiprocessing import Pool
 import time
-from tools.statistics import VocabularyStats
+from onmt.utils.statistics import VocabularyStats
 
 
 def check_existing_pt_files(opt, corpus_type, ids, existing_fields):
@@ -121,13 +121,13 @@ def process_one_shard(corpus_params, params):
     data_path = "{:s}.{:s}.{:d}.pt".format(opt.save_data, shard_base, i)
 
     if True:
-        src_data_path = "{:s}.{:s}.{:s}_{:d}.png".format(opt.save_data, shard_base, "src_hist" ,i)
+        src_data_path = "{:s}.{:s}.{:s}_{:d}.png".format(opt.save_data, shard_base, "src_hist", i)
         tgt_data_path = "{:s}.{:s}.{:s}_{:d}.png".format(opt.save_data, shard_base, "tgt_hist", i)
         src_lens = list(map(lambda x: len(x.src[0]), dataset.examples))
         tgt_lens = list(map(lambda x: len(x.tgt[0]), dataset.examples))
         histogram(data=src_lens, path=src_data_path)
         histogram(data=tgt_lens, path=tgt_data_path)
-
+        logger.info(f"Phase [{shard_base}] average src token {sum(src_lens)/len(src_lens)}, tgt token {sum(tgt_lens)/len(tgt_lens)}")
     logger.info(" * saving %sth %s data shard to %s." % (i, shard_base, data_path))
 
     dataset.save(data_path)
