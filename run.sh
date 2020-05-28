@@ -1,14 +1,8 @@
 #!/bin/bash
 
-CurrentDate=$(date +%F)
+
 
 target=$1
-
-# Root envs
-RootPath=`pwd`/examples/learning_fix
-ConfigPath=${RootPath}/config
-LogFile=${RootPath}/logs/${target}-${CurrentDate}.log
-BinPath=${RootPath}/bin
 
 if [ "$#" -ne 1 ] ; then
   echo "Missing Parameters ..."
@@ -16,12 +10,48 @@ if [ "$#" -ne 1 ] ; then
   exit 1
 fi
 
+############################# Root envs ############################
+RootPath=`pwd`/examples/learning_fix
+ConfigPath=${RootPath}/config
+BinPath=${RootPath}/bin
+CurrentDate=$(date +%F)
 
 ############################
+LogFile=${RootPath}/logs/${target}-${CurrentDate}.log
 ConfigAbstract=${ConfigPath}/application_small.conf
 ConfigFile=${ConfigPath}/small_1.yml
 ModelCheckpoint=${RootPath}/data/small/small_step_20000.pt
-PredictOutput=${RootPath}/data/small/predictions.txt
+TranslateSource=${RootPath}/data/small/test-buggy.txt
+TranslateTarget=${RootPath}/data/small/test-fixed.txt
+TranslateOutput=${RootPath}/data/small/predictions.txt
+
+_bleu() {
+  echo "------------------- BLEU ------------------------"
+
+  echo "buggy vs fixed"
+  ${BinPath}/multi-bleu.perl ${TranslateTarget} < ${TranslateSource}
+
+  echo "prediction vs fixed"
+  ${BinPath}/multi-bleu.perl ${TranslateTarget} < ${TranslateOutput}
+}
+
+_classification() {
+  echo "------------------- CLASSIFICATION ------------------------"
+
+  total=`wc -l ${TranslateTarget}| awk '{print $1}'`
+  echo "Test Set: $total"
+
+  echo "Predictions"
+  output=$(python3 ${BinPath}/prediction_classifier.py ${TranslateSource} ${TranslateTarget} "${TranslateOutput}" 2>&1)
+  perf=`awk '{print $1}' <<< "$output"`
+  changed=`awk '{print $2}' <<< "$output"`
+  bad=`awk '{print $3}' <<< "$output"`
+  perf_perc="$(echo "scale=2; $perf * 100 / $total" | bc)"
+
+  echo "Perf: $perf ($perf_perc%)"
+  echo "Pot : $changed"
+  echo "Bad : $bad"
+}
 
 
 
@@ -43,7 +73,9 @@ _preprocess() {
 
 _translate() {
   set -x
-  onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -output ${PredictOutput} -log_file ${LogFile}
+  onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -output ${TranslateOutput} -tgt ${TranslateTarget} -src ${TranslateSource} -log_file ${LogFile}
+  _bleu
+  _classification
 }
 
 
