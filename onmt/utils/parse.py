@@ -1,22 +1,87 @@
 import configargparse as cfargparse
-import os
-
+from configargparse import ConfigFileParser, ConfigFileParserException
 import torch
-
 import onmt.opts as opts
 from onmt.utils.logging import logger
+import os
+from collections import OrderedDict
+
+class CustomizedYAMLConfigFileParser(ConfigFileParser):
+    """Parses YAML config files. Depends on the PyYAML module.
+    https://pypi.python.org/pypi/PyYAML
+    """
+    def __init__(self):
+        self.work_model = "preprocess"
+
+    def get_syntax_description(self):
+        msg = ("The config file uses YAML syntax and must represent a YAML "
+            "'mapping' (for details, see http://learn.getgrav.org/advanced/yaml).")
+        return msg
+
+    def set_work_model(self, value):
+        self.work_model = value
+
+    def _load_yaml(self):
+        """lazy-import PyYAML so that configargparse doesn't have to dependend
+        on it unless this parser is used."""
+        try:
+            import yaml
+        except ImportError:
+            raise ConfigFileParserException("Could not import yaml. "
+                "It can be installed by running 'pip install PyYAML'")
+
+        return yaml
+
+    def parse(self, stream):
+        """Parses the keys and values from a config file."""
+        yaml = self._load_yaml()
+
+        try:
+            parsed_obj = yaml.safe_load(stream)
+        except Exception as e:
+            raise ConfigFileParserException("Couldn't parse config file: %s" % e)
+
+        if not isinstance(parsed_obj, dict):
+            raise ConfigFileParserException("The config file doesn't appear to "
+                "contain 'key: value' pairs (aka. a YAML mapping). "
+                "yaml.load('%s') returned type '%s' instead of 'dict'." % (
+                getattr(stream, 'name', 'stream'),  type(parsed_obj).__name__))
+
+        result = OrderedDict()
+        for key, value in parsed_obj[self.work_model].items():
+            if isinstance(value, list):
+                result[key] = value
+            else:
+                result[key] = str(value)
+
+        return result
+
+
+    def serialize(self, items, default_flow_style=False):
+        """Does the inverse of config parsing by taking parsed values and
+        converting them back to a string representing config file contents.
+
+        Args:
+            default_flow_style: defines serialization format (see PyYAML docs)
+        """
+
+        # lazy-import so there's no dependency on yaml unless this class is used
+        yaml = self._load_yaml()
+
+        # it looks like ordering can't be preserved: http://pyyaml.org/ticket/29
+        items = dict(items)
+        return yaml.dump(items, default_flow_style=default_flow_style)
 
 
 class ArgumentParser(cfargparse.ArgumentParser):
-    def __init__(
-            self,
-            config_file_parser_class=cfargparse.YAMLConfigFileParser,
-            formatter_class=cfargparse.ArgumentDefaultsHelpFormatter,
-            **kwargs):
+    def __init__(self, model, config_file_parser_class=CustomizedYAMLConfigFileParser,
+                 formatter_class=cfargparse.ArgumentDefaultsHelpFormatter, **kwargs):
         super(ArgumentParser, self).__init__(
             config_file_parser_class=config_file_parser_class,
             formatter_class=formatter_class,
             **kwargs)
+        assert model in ["abstract", "preprocess", "train", "translate"], "Unsupported model type %s" % model
+        self._config_file_parser.set_work_model(model)
 
     @classmethod
     def defaults(cls, *args):
@@ -164,3 +229,5 @@ class ArgumentParser(cfargparse.ArgumentParser):
             "Please check path of your src vocab!"
         assert not opt.tgt_vocab or os.path.isfile(opt.tgt_vocab), \
             "Please check path of your tgt vocab!"
+
+

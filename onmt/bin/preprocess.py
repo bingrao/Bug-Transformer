@@ -390,10 +390,10 @@ def preprocess(opt):
                            src_pos_reader=src_pos_reader, tgt_pos_reader=tgt_pos_reader)
 
     logger.info("--- %s seconds ---" % (time.time() - start_time))
-
+current_target = "None"
 def _get_parser():
-    parser = ArgumentParser(description='preprocess.py')
 
+    parser = ArgumentParser(model="preprocess", description='preprocess.py')
     opts.config_opts(parser)
     opts.preprocess_opts(parser)
     return parser

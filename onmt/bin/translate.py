@@ -34,7 +34,7 @@ def translate(opt):
 
 
 def _get_parser():
-    parser = ArgumentParser(description='translate.py')
+    parser = ArgumentParser(model="translate", description='translate.py')
 
     opts.config_opts(parser)
     opts.translate_opts(parser)

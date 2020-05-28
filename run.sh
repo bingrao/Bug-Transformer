@@ -23,6 +23,7 @@ ConfigPreprocess=${ConfigPath}/small_preprocess_1G_1.yml
 ConfigTrain=${ConfigPath}/small_train_1G_1.yml
 ConfigTranslate=${ConfigPath}/small_translate_1G_1.yml
 ModelCheckpoint=${RootPath}/data/small/small_step_20000.pt
+ConfigFile=${ConfigPath}/small_1.yml
 
 case ${target} in
    "abstract")
@@ -33,24 +34,24 @@ case ${target} in
 
    "preprocess")
       set -x
-      onmt_preprocess -config ${ConfigPreprocess} -log_file ${LogFile}
+      onmt_preprocess -config ${ConfigFile} -log_file ${LogFile}
    ;;
 
    "train")
       set -x
-      onmt_train -config ${ConfigTrain} -log_file ${LogFile}
+      onmt_train -config ${ConfigFile} -log_file ${LogFile}
    ;;
 
    "translate")
       set -x
-      onmt_translate -config ${ConfigTranslate} -model ${ModelCheckpoint} -log_file ${LogFile}
+      onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -log_file ${LogFile}
    ;;
 
    "all")
       set -x
-      onmt_preprocess -config ${ConfigPreprocess} -log_file ${LogFile}
-      onmt_train -config ${ConfigTrain} -log_file ${LogFile}
-      onmt_translate -config ${ConfigTranslate} -model ${ModelCheckpoint} -log_file ${LogFile}
+      onmt_preprocess -config ${ConfigFile} -log_file ${LogFile}
+      onmt_train -config ${ConfigFile} -log_file ${LogFile}
+      onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -log_file ${LogFile}
    ;;
 
    *)
