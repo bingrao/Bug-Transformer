@@ -1,14 +1,13 @@
 #!/bin/bash
 
-
-
-target=$1
-
 if [ "$#" -ne 1 ] ; then
   echo "Missing Parameters ..."
   echo "Usage: $0 target[abstract|preprocess|train|translate|all]" >&2
   exit 1
 fi
+
+
+target=$1
 
 ############################# Root envs ############################
 RootPath=`pwd`/examples/learning_fix
@@ -42,7 +41,7 @@ _classification() {
   echo "Test Set: $total"
 
   echo "Predictions"
-  output=$(python3 ${BinPath}/prediction_classifier.py ${TranslateSource} ${TranslateTarget} "${TranslateOutput}" 2>&1)
+  output=$(python3 ${BinPath}/prediction_classifier.py "${TranslateSource}" "${TranslateTarget}" "${TranslateOutput}" 2>&1)
   perf=`awk '{print $1}' <<< "$output"`
   changed=`awk '{print $2}' <<< "$output"`
   bad=`awk '{print $3}' <<< "$output"`
@@ -72,7 +71,6 @@ _preprocess() {
 }
 
 _translate() {
-  set -x
   onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -output ${TranslateOutput} -tgt ${TranslateTarget} -src ${TranslateSource} -log_file ${LogFile}
   _bleu
   _classification
