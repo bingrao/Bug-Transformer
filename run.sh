@@ -23,7 +23,7 @@ ModelCheckpoint=${RootPath}/data/small/small_step_20000.pt
 TranslateSource=${RootPath}/data/small/test-buggy.txt
 TranslateTarget=${RootPath}/data/small/test-fixed.txt
 TranslateOutput=${RootPath}/data/small/predictions.txt
-
+TranslateBeamSize=10
 _bleu() {
   echo "------------------- BLEU ------------------------"
 
@@ -71,11 +71,47 @@ _preprocess() {
 }
 
 _translate() {
-  onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -output ${TranslateOutput} -tgt ${TranslateTarget} -src ${TranslateSource} -log_file ${LogFile}
-  _bleu
-  _classification
+  beam=$1
+  onmt_translate -config ${ConfigFile} \
+                 -model ${ModelCheckpoint} \
+                 -output ${TranslateOutput} \
+                 -tgt ${TranslateTarget} \
+                 -src ${TranslateSource} \
+                 -log_file ${LogFile} \
+                 -beam_size ${beam}
 }
 
+inference(){
+  echo "------------------- TESTING BEAM SEARCH ------------------------"
+  beam_widths=("5" "10" "15" "20" "25" "30" "35" "40" "45" "50" "100" "200")
+
+  for beam_width in ${beam_widths[*]}
+  do
+    echo "Beam width: $beam_width"
+    SECONDS=0
+    _translate ${$beam_width}
+    elapsed=$SECONDS
+    echo "---------- TIME REPORT ----------"
+	  echo "Beam width: $beam_width"
+	  echo "Total seconds: $elapsed"
+
+    total=`wc -l ${TranslateSource}| awk '{print $1}'`
+    patches=$(($total * $beam_width))
+    avg="$(echo "scale=6; $elapsed / $patches" | bc)"
+    avg_bug="$(echo "scale=6; $elapsed / $total" | bc)"
+
+    echo "Total bugs: $total"
+    echo "Total patches: $patches"
+    echo "Avg patch/sec: $avg"
+    echo "Avg bug/sec: $avg_bug"
+    echo "---------------------------------"
+
+    _bleu
+
+
+    _classification
+  done
+}
 
 case ${target} in
    "abstract")
@@ -91,13 +127,17 @@ case ${target} in
    ;;
 
    "translate")
-      _translate
+      _translate ${TranslateBeamSize}
+      _bleu
+      _classification
    ;;
 
    "all")
       _preprocess
       _train
-      _translate
+      _translate ${TranslateBeamSize}
+      _bleu
+      _classification
    ;;
 
    *)
