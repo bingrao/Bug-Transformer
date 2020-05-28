@@ -19,39 +19,55 @@ fi
 
 ############################
 ConfigAbstract=${ConfigPath}/application_small.conf
-ConfigPreprocess=${ConfigPath}/small_preprocess_1G_1.yml
-ConfigTrain=${ConfigPath}/small_train_1G_1.yml
-ConfigTranslate=${ConfigPath}/small_translate_1G_1.yml
-ModelCheckpoint=${RootPath}/data/small/small_step_20000.pt
 ConfigFile=${ConfigPath}/small_1.yml
+ModelCheckpoint=${RootPath}/data/small/small_step_20000.pt
+PredictOutput=${RootPath}/data/small/predictions.txt
+
+
+
+_abstract() {
+  set -x
+  export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
+  scala ${BinPath}/java_abstract-1.0-jar-with-dependencies.jar ${ConfigAbstract}
+}
+
+_train() {
+  set -x
+  onmt_train -config ${ConfigFile} -log_file ${LogFile}
+}
+
+_preprocess() {
+  set -x
+  onmt_preprocess -config ${ConfigFile} -log_file ${LogFile}
+}
+
+_translate() {
+  set -x
+  onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -output ${PredictOutput} -log_file ${LogFile}
+}
+
 
 case ${target} in
    "abstract")
-      set -x
-      export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
-      scala ${BinPath}/java_abstract-1.0-jar-with-dependencies.jar ${ConfigAbstract}
+      _abstract
    ;;
 
    "preprocess")
-      set -x
-      onmt_preprocess -config ${ConfigFile} -log_file ${LogFile}
+      _preprocess
    ;;
 
    "train")
-      set -x
-      onmt_train -config ${ConfigFile} -log_file ${LogFile}
+      _train
    ;;
 
    "translate")
-      set -x
-      onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -log_file ${LogFile}
+      _translate
    ;;
 
    "all")
-      set -x
-      onmt_preprocess -config ${ConfigFile} -log_file ${LogFile}
-      onmt_train -config ${ConfigFile} -log_file ${LogFile}
-      onmt_translate -config ${ConfigFile} -model ${ModelCheckpoint} -log_file ${LogFile}
+      _preprocess
+      _train
+      _translate
    ;;
 
    *)
