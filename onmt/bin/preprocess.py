@@ -8,6 +8,7 @@ import glob
 import gc
 import torch
 from collections import Counter, defaultdict
+from tools.statistics import histogram
 
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import split_corpus
@@ -22,6 +23,8 @@ from onmt.inputters.inputter import _build_fields_vocab,\
 from functools import partial
 from multiprocessing import Pool
 import time
+from tools.statistics import VocabularyStats
+
 
 def check_existing_pt_files(opt, corpus_type, ids, existing_fields):
     """ Check if there are existing .pt files to avoid overwriting them """
@@ -88,6 +91,7 @@ def process_one_shard(corpus_params, params):
         filter_pred=filter_pred,
         corpus_id=maybe_id
     )
+
     if corpus_type == "train" and existing_fields is None:
         for ex in dataset.examples:
             sub_sub_counter['corpus_id'].update(["train" if maybe_id is None else maybe_id])
@@ -115,6 +119,14 @@ def process_one_shard(corpus_params, params):
     else:
         shard_base = corpus_type
     data_path = "{:s}.{:s}.{:d}.pt".format(opt.save_data, shard_base, i)
+
+    if True:
+        src_data_path = "{:s}.{:s}.{:s}_{:d}.png".format(opt.save_data, shard_base, "src_hist" ,i)
+        tgt_data_path = "{:s}.{:s}.{:s}_{:d}.png".format(opt.save_data, shard_base, "tgt_hist", i)
+        src_lens = list(map(lambda x: len(x.src[0]), dataset.examples))
+        tgt_lens = list(map(lambda x: len(x.tgt[0]), dataset.examples))
+        histogram(data=src_lens, path=src_data_path)
+        histogram(data=tgt_lens, path=tgt_data_path)
 
     logger.info(" * saving %sth %s data shard to %s." % (i, shard_base, data_path))
 
@@ -296,6 +308,10 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
         if fields.get("corpus_id", False):
             fields["corpus_id"].vocab = new_fields["corpus_id"].vocab_cls(
                 counters["corpus_id"])
+        if True:
+            _vocab = VocabularyStats(fields)
+            _vocab.top_src(path=opt.save_data + '.vocab.src.png')
+            _vocab.top_tgt(path=opt.save_data + '.vocab.tgt.png')
 
         torch.save(fields, vocab_path)
 

@@ -13,7 +13,7 @@
     <option name="ADD_SOURCE_ROOTS" value="false" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/preprocess.py" />
-    <option name="PARAMETERS" value="-config examples/learning_fix/config/small_preprocess_1G_1_bing_1.yml -overwrite -num_threads 20" />
+    <option name="PARAMETERS" value="-config examples/learning_fix/config/small_preprocess_1G_1.yml -overwrite -num_threads 20" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />
