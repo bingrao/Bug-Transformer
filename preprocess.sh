@@ -21,7 +21,7 @@ case ${dataset} in
       set -x
       onmt_preprocess -config examples/learning_fix/config/small_preprocess_1G_3.yml
       ;;
-   "small_path")
+   "median")
       set -x
       onmt_preprocess -config examples/learning_fix/config/small_preprocess_1G_4.yml
       ;;
