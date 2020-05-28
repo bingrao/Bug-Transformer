@@ -84,9 +84,9 @@ class ArgumentParser(cfargparse.ArgumentParser):
         self._config_file_parser.set_work_model(model)
 
     @classmethod
-    def defaults(cls, *args):
+    def defaults(cls, model, *args):
         """Get default arguments added to a parser by all ``*args``."""
-        dummy_parser = cls()
+        dummy_parser = cls(model)
         for callback in args:
             callback(dummy_parser)
         defaults = dummy_parser.parse_known_args([])[0]
@@ -146,11 +146,11 @@ class ArgumentParser(cfargparse.ArgumentParser):
                             model_opt.full_context_alignment))
 
     @classmethod
-    def ckpt_model_opts(cls, ckpt_opt):
+    def ckpt_model_opts(cls, model, ckpt_opt):
         # Load default opt values, then overwrite with the opts in
         # the checkpoint. That way, if there are new options added,
         # the defaults are used.
-        opt = cls.defaults(opts.model_opts)
+        opt = cls.defaults(model, opts.model_opts)
         opt.__dict__.update(ckpt_opt.__dict__)
         return opt
 

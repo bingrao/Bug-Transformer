@@ -10,9 +10,14 @@ from onmt.models.sru import CheckSRU
 def config_opts(parser):
     parser.add('-config', '--config', required=False,
                is_config_file_arg=True, help='config file path')
+
     parser.add('-save_config', '--save_config', required=False,
                is_write_out_config_file_arg=True,
                help='config file save path')
+
+    parser.add('--work_model', '-work_model', type=str, default='preprocess',
+               choices=['preprocess', 'train', 'translate'],
+               help="Indicator that what kinds of task is working on right now")
 
 
 def model_opts(parser):

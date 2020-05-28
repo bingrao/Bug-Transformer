@@ -1,4 +1,5 @@
 preprocess:
+  work_model: preprocess
   train_src: examples/learning_fix/data/small/train-buggy.txt
   train_tgt: examples/learning_fix/data/small/train-fixed.txt
   valid_src: examples/learning_fix/data/small/eval-buggy.txt
@@ -15,6 +16,7 @@ preprocess:
   data_type: "code"
 
 train:
+  work_model: train
   data: examples/learning_fix/data/small/small
   save_model: examples/learning_fix/data/small/small
   save_checkpoint_steps: 10000
@@ -58,6 +60,7 @@ train:
     - 0
 
 translate:
+  work_model: translate
   model: examples/learning_fix/data/small/small_step_20000.pt
   data_type: "code"
   src: examples/learning_fix/data/small/test-buggy.txt

@@ -88,13 +88,13 @@ def build_decoder(opt, embeddings):
     return str2dec[dec_type].from_opt(opt, embeddings)
 
 
-def load_test_model(opt, model_path=None):
+def load_test_model(model, opt, model_path=None):
     if model_path is None:
         model_path = opt.models[0]
     checkpoint = torch.load(model_path,
                             map_location=lambda storage, loc: storage)
 
-    model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opt'])
+    model_opt = ArgumentParser.ckpt_model_opts(model, checkpoint['opt'])
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
     vocab = checkpoint['vocab']
