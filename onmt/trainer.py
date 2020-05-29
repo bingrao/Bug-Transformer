@@ -72,8 +72,7 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
             pad_idx=src_field.pad_token,
             end_of_sentence_mask=src_field.end_of_sentence_mask,
             word_start_mask=src_field.word_start_mask,
-            device_id=device_id
-        )
+            device_id=device_id)
 
     report_manager = onmt.utils.build_report_manager(opt, gpu_rank)
     trainer = onmt.Trainer(model, train_loss, valid_loss, optim, trunc_size,
@@ -276,8 +275,7 @@ class Trainer(object):
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: validate step %d'
                                 % (self.gpu_rank, step))
-                valid_stats = self.validate(
-                    valid_iter, moving_average=self.moving_average)
+                valid_stats = self.validate(valid_iter, moving_average=self.moving_average)
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: gather valid stat \
                                 step %d' % (self.gpu_rank, step))
@@ -335,8 +333,7 @@ class Trainer(object):
                 tgt = batch.tgt
 
                 # F-prop through the model.
-                outputs, attns = valid_model(src, tgt, src_lengths,
-                                             with_align=self.with_align)
+                outputs, attns = valid_model(src, tgt, src_lengths, with_align=self.with_align)
 
                 # Compute loss.
                 _, batch_stats = self.valid_loss(batch, outputs, attns)

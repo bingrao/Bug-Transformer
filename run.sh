@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [ "$#" -ne 1 ] ; then
   echo "Missing Parameters ..."
@@ -15,16 +15,39 @@ ConfigPath=${RootPath}/config
 BinPath=${RootPath}/bin
 CurrentDate=$(date +%F)
 
-############################
+########################### Project Parametes #######################
+# Log file
 LogFile=${RootPath}/logs/${target}-${CurrentDate}.log
+
+# Config file for scala application to generate abstrace code
 ConfigAbstract=${ConfigPath}/application_small.conf
+
+# Config files for model data preprocess, train, translate
 ConfigFile=${ConfigPath}/small_1.yml
+
+# Special parameters for model translate
+
+# Test training model checkpoint path for translating
 ModelCheckpoint=${RootPath}/data/small/small_step_20000.pt
+
+# The buggy code (source) to translate task
 TranslateSource=${RootPath}/data/small/test-buggy.txt
+
+# The fixed code (target) to translate task
 TranslateTarget=${RootPath}/data/small/test-fixed.txt
+
+# The model predict output, each line is corresponding to the line in buggy code
 TranslateOutput=${RootPath}/data/small/predictions.txt
+
+# The beam size for prediction
 TranslateBeamSize=10
-_bleu() {
+
+#####################################################################
+########################### Helper functions  #######################
+#####################################################################
+
+
+function _bleu() {
   echo "------------------- BLEU ------------------------"
 
   echo "buggy vs fixed"
@@ -34,7 +57,7 @@ _bleu() {
   ${BinPath}/multi-bleu.perl ${TranslateTarget} < ${TranslateOutput}
 }
 
-_classification() {
+function _classification() {
   echo "------------------- CLASSIFICATION ------------------------"
 
   total=`wc -l ${TranslateTarget}| awk '{print $1}'`
@@ -52,25 +75,27 @@ _classification() {
   echo "Bad : $bad"
 }
 
-
-
-_abstract() {
+function _abstract() {
+  echo "------------------- Code Abstract ------------------------"
   set -x
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
   scala ${BinPath}/java_abstract-1.0-jar-with-dependencies.jar ${ConfigAbstract}
 }
 
-_train() {
+function _train() {
+  echo "------------------- Training ------------------------"
   set -x
   onmt_train -config ${ConfigFile} -log_file ${LogFile}
 }
 
-_preprocess() {
+function _preprocess() {
   set -x
   onmt_preprocess -config ${ConfigFile} -log_file ${LogFile}
 }
 
-_translate() {
+function _translate() {
+  echo "------------------- Translate  ------------------------"
+  set -x
   beam=$1
   onmt_translate -config ${ConfigFile} \
                  -model ${ModelCheckpoint} \
@@ -81,8 +106,8 @@ _translate() {
                  -beam_size ${beam}
 }
 
-inference(){
-  echo "------------------- TESTING BEAM SEARCH ------------------------"
+function _inference(){
+  echo "------------------- Test Beach Search  ------------------------"
   beam_widths=("5" "10" "15" "20" "25" "30" "35" "40" "45" "50" "100" "200")
 
   for beam_width in ${beam_widths[*]}
@@ -91,7 +116,7 @@ inference(){
     SECONDS=0
     _translate ${$beam_width}
     elapsed=$SECONDS
-    echo "---------- TIME REPORT ----------"
+    echo "---------- Time report ----------"
 	  echo "Beam width: $beam_width"
 	  echo "Total seconds: $elapsed"
 
@@ -107,7 +132,6 @@ inference(){
     echo "---------------------------------"
 
     _bleu
-
 
     _classification
   done
@@ -139,10 +163,12 @@ case ${target} in
       _bleu
       _classification
    ;;
-
+   "inference")
+      _inference
+   ;;
    *)
-     echo "There is no match case for ${dataset}"
-     echo "Usage: $0 dataset[small|small_old|small_tree|small_path] " >&2
+     echo "There is no match case for ${target}"
+     echo "Usage: $0 target[abstract|preprocess|train|translate|all]" >&2
      exit 1
    ;;
 esac
