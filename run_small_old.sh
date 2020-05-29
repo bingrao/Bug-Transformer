@@ -2,11 +2,13 @@
 
 if [ "$#" -ne 1 ] ; then
   echo "Missing Parameters ..."
-  echo "Usage: $0 target[abstract|preprocess|train|translate|all|inference]" >&2
+  echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference]" >&2
   exit 1
 fi
 
+dataset="small_old"
 target=$1
+
 
 ############################# Root envs ############################
 RootPath=`pwd`/examples/learning_fix
@@ -26,27 +28,27 @@ CurrentDate=$(date +%F)
 ########################### Project Parameters #######################
 # Log file
 
-LogFile=${LogPath}/${target}-${CurrentDate}.log
+LogFile=${LogPath}/${dataset}-${target}-${CurrentDate}.log
 
 # Config file for scala application to generate abstract code
-ConfigAbstract=${ConfigPath}/application_small.conf
+ConfigAbstract=${ConfigPath}/application_${dataset}.conf
 
 # Config files for model data preprocess, train, translate
-ConfigFile=${ConfigPath}/small_1.yml
+ConfigFile=${ConfigPath}/${dataset}_1.yml
 
 ######### Special parameters for model translate ###################
 
 # Test training model checkpoint path for translating
-ModelCheckpoint=${DataPath}/small/small_step_20000.pt
+ModelCheckpoint=${DataPath}/${dataset}/${dataset}_step_20000.pt
 
 # The buggy code (source) to translate task
-TranslateSource=${DataPath}/small/test-buggy.txt
+TranslateSource=${DataPath}/${dataset}/test-buggy.txt
 
 # The fixed code (target) to translate task
-TranslateTarget=${DataPath}/small/test-fixed.txt
+TranslateTarget=${DataPath}/${dataset}/test-fixed.txt
 
 # The model predict output, each line is corresponding to the line in buggy code
-TranslateOutput=${DataPath}/small/predictions.txt
+TranslateOutput=${DataPath}/${dataset}/predictions.txt
 
 # The beam size for prediction
 TranslateBeamSize=10
@@ -93,18 +95,16 @@ function _abstract() {
 
 function _train() {
   echo "------------------- Training ------------------------"
-  set -x
   onmt_train -config ${ConfigFile} -log_file ${LogFile}
 }
 
 function _preprocess() {
-  set -x
+  echo "------------------- Preprocess  ------------------------"
   onmt_preprocess -config ${ConfigFile} -log_file ${LogFile}
 }
 
 function _translate() {
   echo "------------------- Translate  ------------------------"
-  set -x
   beam=$1
   onmt_translate -config ${ConfigFile} \
                  -model ${ModelCheckpoint} \
@@ -123,7 +123,7 @@ function _inference(){
   do
     echo "Beam width: $beam_width"
     SECONDS=0
-    _translate ${$beam_width}
+    _translate ${beam_width}
     elapsed=$SECONDS
     echo "---------- Time report ----------"
 	  echo "Beam width: $beam_width"
@@ -177,7 +177,7 @@ case ${target} in
    ;;
    *)
      echo "There is no match case for ${target}"
-     echo "Usage: $0 target[abstract|preprocess|train|translate|all|inference]" >&2
+     echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference]" >&2
      exit 1
    ;;
 esac
