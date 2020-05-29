@@ -2,10 +2,9 @@
 
 if [ "$#" -ne 1 ] ; then
   echo "Missing Parameters ..."
-  echo "Usage: $0 target[abstract|preprocess|train|translate|all]" >&2
+  echo "Usage: $0 target[abstract|preprocess|train|translate|all|inference]" >&2
   exit 1
 fi
-
 
 target=$1
 
@@ -13,31 +12,41 @@ target=$1
 RootPath=`pwd`/examples/learning_fix
 ConfigPath=${RootPath}/config
 BinPath=${RootPath}/bin
+LogPath=${RootPath}/logs
+DataPath=${RootPath}/data
+
+
+[ -d $ConfigPath ] || mkdir -p $ConfigPath
+[ -d $BinPath ] || mkdir -p $BinPath
+[ -d $LogPath ] || mkdir -p $LogPath
+[ -d $DataPath ] || mkdir -p $DataPath
+
 CurrentDate=$(date +%F)
 
-########################### Project Parametes #######################
+########################### Project Parameters #######################
 # Log file
-LogFile=${RootPath}/logs/${target}-${CurrentDate}.log
 
-# Config file for scala application to generate abstrace code
+LogFile=${LogPath}/${target}-${CurrentDate}.log
+
+# Config file for scala application to generate abstract code
 ConfigAbstract=${ConfigPath}/application_small.conf
 
 # Config files for model data preprocess, train, translate
 ConfigFile=${ConfigPath}/small_1.yml
 
-# Special parameters for model translate
+######### Special parameters for model translate ###################
 
 # Test training model checkpoint path for translating
-ModelCheckpoint=${RootPath}/data/small/small_step_20000.pt
+ModelCheckpoint=${DataPath}/small/small_step_20000.pt
 
 # The buggy code (source) to translate task
-TranslateSource=${RootPath}/data/small/test-buggy.txt
+TranslateSource=${DataPath}/small/test-buggy.txt
 
 # The fixed code (target) to translate task
-TranslateTarget=${RootPath}/data/small/test-fixed.txt
+TranslateTarget=${DataPath}/small/test-fixed.txt
 
 # The model predict output, each line is corresponding to the line in buggy code
-TranslateOutput=${RootPath}/data/small/predictions.txt
+TranslateOutput=${DataPath}/small/predictions.txt
 
 # The beam size for prediction
 TranslateBeamSize=10
@@ -168,7 +177,7 @@ case ${target} in
    ;;
    *)
      echo "There is no match case for ${target}"
-     echo "Usage: $0 target[abstract|preprocess|train|translate|all]" >&2
+     echo "Usage: $0 target[abstract|preprocess|train|translate|all|inference]" >&2
      exit 1
    ;;
 esac
