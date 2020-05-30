@@ -1,6 +1,6 @@
 # repo-specific stuff
 pred.txt
-multi-bleu.perl
+#multi-bleu.perl
 *.pt
 \#*#
 .idea
