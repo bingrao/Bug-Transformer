@@ -102,7 +102,7 @@ echo "TranslateOutput=${TranslateOutput}"
 # The beam size for prediction
 TranslateBeamSize=10
 echo "TranslateBeamSize=${TranslateBeamSize}"
-exit 1
+
 #####################################################################
 ########################### Helper functions  #######################
 #####################################################################
