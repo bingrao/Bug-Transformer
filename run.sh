@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 
-if [ "$#" -ne 2 ] ; then
+if [ "$#" -ne 3 ] ; then
   echo "Missing Parameters ..."
-  echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference]" >&2
+  echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference] config" >&2
   exit 1
 fi
 
 dataset=$1
 target=$2
+configFile=$3
+prefix="${dataset}-target-$(echo ${configFile} | cut -d'.' -f1)"
+
 
 
 ############################# Root envs ############################
@@ -27,32 +30,79 @@ CurrentDate=$(date +%F)
 
 ########################### Project Parameters #######################
 # Log file
-
-LogFile=${LogPath}/${dataset}-${target}-${CurrentDate}.log
-
-# Config file for scala application to generate abstract code
-ConfigAbstract=${ConfigPath}/application_${dataset}.conf
+LogFile=${LogPath}/${prefix}-${CurrentDate}.log
 
 # Config files for model data preprocess, train, translate
-ConfigFile=${ConfigPath}/${dataset}_1.yml
+ConfigFile=${ConfigPath}/${configFile}
+if [ -f "$ConfigFile" ]; then
+    echo "Loading config from $ConfigFile."
+else
+    echo "Config file $ConfigFile does not exist."
+    exit 1
+fi
 
-######### Special parameters for model translate ###################
+function parse_and_print_yaml {
+   local prefix=$2
+   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   sed -ne "s|^\($s\):|\1|" \
+        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+   awk -F$fs '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+      if (length($3) > 0) {
+         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+      }
+   }'
+}
+
+function parse_yaml() {
+   local config_file=$1
+   local prefix=$2
+   local parameter=$3
+   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   local reg=$(sed -ne "s|^\($s\):|\1|" \
+          -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+          -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $config_file |
+           awk -F$fs '{
+              indent = length($1)/2;
+              vname[indent] = $2;
+              for (i in vname) {if (i > indent) {delete vname[i]}}
+              if (length($3) > 0) {
+                 vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])}
+                 if (vn == "'$prefix'" && $2 == "'$parameter'"){
+                   print($3);
+                 }
+              }
+           }')
+   echo ${reg}
+}
+
+
+######### Internal Special parameters for model translate ###################
 
 # Test training model checkpoint path for translating
-ModelCheckpoint=${DataPath}/${dataset}/${dataset}_step_20000.pt
+ModelCheckpoint=$(parse_yaml "${ConfigFile}" "translate" "model")
+echo "ModelCheckpoint=${ModelCheckpoint}"
 
 # The buggy code (source) to translate task
-TranslateSource=${DataPath}/${dataset}/test-buggy.txt
+TranslateSource=$(parse_yaml "${ConfigFile}" "translate" "src")
+echo "TranslateSource=${TranslateSource}"
 
 # The fixed code (target) to translate task
-TranslateTarget=${DataPath}/${dataset}/test-fixed.txt
+TranslateTarget=$(parse_yaml "${ConfigFile}" "translate" "tgt")
+echo "TranslateTarget=${TranslateTarget}"
 
 # The model predict output, each line is corresponding to the line in buggy code
-TranslateOutput=${DataPath}/${dataset}/predictions.txt
+TranslateOutput=$(parse_yaml "${ConfigFile}" "translate" "output")
+echo "TranslateOutput=${TranslateOutput}"
 
 # The beam size for prediction
 TranslateBeamSize=10
-
+echo "TranslateBeamSize=${TranslateBeamSize}"
+exit 1
 #####################################################################
 ########################### Helper functions  #######################
 #####################################################################
@@ -88,6 +138,14 @@ function _classification() {
 
 function _abstract() {
   echo "------------------- Code Abstract ------------------------"
+  # Config file for scala application to generate abstract code
+  ConfigAbstract=${ConfigPath}/application_${dataset}.conf
+  if [ -f "$ConfigAbstract" ]; then
+      echo "$ConfigAbstract exists."
+  else
+      echo "$ConfigAbstract does not exist."
+      exit 1
+  fi
   set -x
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
   scala ${BinPath}/java_abstract-1.0-jar-with-dependencies.jar ${ConfigAbstract}
@@ -177,7 +235,7 @@ case ${target} in
    ;;
    *)
      echo "There is no match case for ${target}"
-     echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference]" >&2
+     echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference] config" >&2
      exit 1
    ;;
 esac

@@ -19,20 +19,20 @@ train:
   work_model: train
   data: examples/learning_fix/data/small/small
   save_model: examples/learning_fix/data/small/small
-  save_checkpoint_steps: 10000
+  save_checkpoint_steps: 1000
   keep_checkpoint: 10
   seed: 3435
   train_steps: 50000
-  valid_steps: 10000
+  valid_steps: 1000
   warmup_steps: 4000
-  report_every: 4000
+  report_every: 1000
 
   decoder_type: transformer
   encoder_type: transformer
-  word_vec_size: 128
-  rnn_size: 128
+  word_vec_size: 512
+  rnn_size: 512
   layers: 6
-  transformer_ff: 1024
+  transformer_ff: 2048
   heads: 8
 
   accum_count: 8
@@ -40,7 +40,7 @@ train:
   adam_beta1: 0.9
   adam_beta2: 0.998
   decay_method: noam
-  learning_rate: 2.0
+  learning_rate: 0.01
   max_grad_norm: 0.0
 
   batch_size: 4096
@@ -61,6 +61,10 @@ train:
 
 translate:
   work_model: translate
+  model: examples/learning_fix/data/small/small_step_20000.pt
+  src: examples/learning_fix/data/small/test-buggy.txt
+  tgt: examples/learning_fix/data/small/test-fixed.txt
+  output: examples/learning_fix/data/small/predictions.txt
   data_type: "code"
   share_vocab: True
   beam_size: 5
