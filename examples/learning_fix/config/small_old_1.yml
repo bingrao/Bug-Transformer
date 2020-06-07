@@ -67,7 +67,6 @@ translate:
   output: examples/learning_fix/data/small_old/predictions.txt
   data_type: "code"
   share_vocab: True
-  beam_size: 5
   min_length: 0
   max_length: 100
-  batch_size: 4096
+  batch_size: 1024
