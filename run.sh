@@ -9,7 +9,7 @@ fi
 dataset=$1
 target=$2
 configFile=$3
-prefix="${dataset}-target-$(echo ${configFile} | cut -d'.' -f1)"
+prefix="${dataset}-$target-$(echo ${configFile} | cut -d'.' -f1)"
 
 ############################# Root envs ############################
 RootPath=$(pwd)
@@ -164,10 +164,6 @@ function _translate() {
   echo "------------------- Translate  ------------------------"
   beam=$1
   onmt_translate -config ${ConfigFile} \
-                 -model ${ModelCheckpoint} \
-                 -output ${TranslateOutput} \
-                 -tgt ${TranslateTarget} \
-                 -src ${TranslateSource} \
                  -log_file ${LogFile} \
                  -beam_size ${beam}
 }
