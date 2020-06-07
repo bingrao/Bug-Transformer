@@ -29,10 +29,10 @@ train:
 
   decoder_type: transformer
   encoder_type: transformer
-  word_vec_size: 512
-  rnn_size: 512
+  word_vec_size: 128
+  rnn_size: 128
   layers: 6
-  transformer_ff: 2048
+  transformer_ff: 1024
   heads: 8
 
   accum_count: 8
