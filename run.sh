@@ -11,14 +11,13 @@ target=$2
 configFile=$3
 prefix="${dataset}-target-$(echo ${configFile} | cut -d'.' -f1)"
 
-
-
 ############################# Root envs ############################
-RootPath=`pwd`/examples/learning_fix
-ConfigPath=${RootPath}/config
-BinPath=${RootPath}/bin
-LogPath=${RootPath}/logs
-DataPath=${RootPath}/data
+RootPath=$(pwd)
+ProjectPath=${RootPath}/examples/learning_fix
+ConfigPath=${ProjectPath}/config
+BinPath=${ProjectPath}/bin
+LogPath=${ProjectPath}/logs
+DataPath=${ProjectPath}/data
 
 
 [ -d $ConfigPath ] || mkdir -p $ConfigPath
@@ -84,19 +83,19 @@ function parse_yaml() {
 ######### Internal Special parameters for model translate ###################
 
 # Test training model checkpoint path for translating
-ModelCheckpoint=$(parse_yaml "${ConfigFile}" "translate" "model")
+ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
 echo "ModelCheckpoint=${ModelCheckpoint}"
 
 # The buggy code (source) to translate task
-TranslateSource=$(parse_yaml "${ConfigFile}" "translate" "src")
+TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
 echo "TranslateSource=${TranslateSource}"
 
 # The fixed code (target) to translate task
-TranslateTarget=$(parse_yaml "${ConfigFile}" "translate" "tgt")
+TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
 echo "TranslateTarget=${TranslateTarget}"
 
 # The model predict output, each line is corresponding to the line in buggy code
-TranslateOutput=$(parse_yaml "${ConfigFile}" "translate" "output")
+TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
 echo "TranslateOutput=${TranslateOutput}"
 
 # The beam size for prediction
