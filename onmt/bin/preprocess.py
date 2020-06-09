@@ -344,6 +344,10 @@ def preprocess(opt):
 
     init_logger(opt.log_file)
 
+    logger.info("The Input Parameters:")
+    for key, val in vars(opt).items():
+        logger.info(f"{key} => {val}")
+
     start_time = time.time()
     logger.info("Extracting features...")
 

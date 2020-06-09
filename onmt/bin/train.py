@@ -24,6 +24,10 @@ def train(opt):
 
     set_random_seed(opt.seed, False)
 
+    logger.info("The Input Parameters:")
+    for key, val in vars(opt).items():
+        logger.info(f"{key} => {val}")
+
     # Load checkpoint if we resume from a previous training.
     if opt.train_from:
         logger.info('Loading checkpoint from %s' % opt.train_from)
