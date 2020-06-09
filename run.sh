@@ -84,23 +84,23 @@ function parse_yaml() {
 
 # Test training model checkpoint path for translating
 ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
-echo "ModelCheckpoint=${ModelCheckpoint}"
+#echo "ModelCheckpoint=${ModelCheckpoint}"
 
 # The buggy code (source) to translate task
 TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
-echo "TranslateSource=${TranslateSource}"
+#echo "TranslateSource=${TranslateSource}"
 
 # The fixed code (target) to translate task
 TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
-echo "TranslateTarget=${TranslateTarget}"
+#echo "TranslateTarget=${TranslateTarget}"
 
 # The model predict output, each line is corresponding to the line in buggy code
 TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
-echo "TranslateOutput=${TranslateOutput}"
+#echo "TranslateOutput=${TranslateOutput}"
 
 # The beam size for prediction
 TranslateBeamSize=10
-echo "TranslateBeamSize=${TranslateBeamSize}"
+#echo "TranslateBeamSize=${TranslateBeamSize}"
 
 #####################################################################
 ########################### Helper functions  #######################
@@ -108,7 +108,7 @@ echo "TranslateBeamSize=${TranslateBeamSize}"
 
 
 function _bleu() {
-  echo "------------------- BLEU ------------------------"
+  echo "------------------- Bleu ------------------------"
 
   echo "buggy vs fixed"
   ${BinPath}/multi-bleu.perl ${TranslateTarget} < ${TranslateSource}
@@ -118,16 +118,15 @@ function _bleu() {
 }
 
 function _classification() {
-  echo "------------------- CLASSIFICATION ------------------------"
+  echo "------------------- Classification ------------------------"
 
-  total=`wc -l ${TranslateTarget}| awk '{print $1}'`
+  total=$(wc -l ${TranslateTarget} | awk '{print $1}')
   echo "Test Set: $total"
 
-  echo "Predictions"
   output=$(python3 ${BinPath}/prediction_classifier.py "${TranslateSource}" "${TranslateTarget}" "${TranslateOutput}" 2>&1)
-  perf=`awk '{print $1}' <<< "$output"`
-  changed=`awk '{print $2}' <<< "$output"`
-  bad=`awk '{print $3}' <<< "$output"`
+  perf=$(awk '{print $1}' <<< "$output")
+  changed=$(awk '{print $2}' <<< "$output")
+  bad=$(awk '{print $3}' <<< "$output")
   perf_perc="$(echo "scale=2; $perf * 100 / $total" | bc)"
 
   echo "Perf: $perf ($perf_perc%)"
@@ -145,44 +144,90 @@ function _abstract() {
       echo "$ConfigAbstract does not exist."
       exit 1
   fi
-  set -x
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
-  scala ${BinPath}/java_abstract-1.0-jar-with-dependencies.jar ${ConfigAbstract}
+  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar ${ConfigAbstract}
+
+  OutputBuggyDir=$(cat "${ConfigAbstract}"  |  grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+  OutputFixedDir=$(cat "${ConfigAbstract}"  |  grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+
+  OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
+  OutputFixedFile=${OutputFixedDir}/total/fixed.txt
+
+  buggy_cnt=$(cat ${OutputBuggyFile} | wc -l)
+  fixed_cnt=$(cat ${OutputFixedFile} | wc -l)
+
+  if [ $buggy_cnt != $fixed_cnt ]
+  then
+     echo "The total number does not match ${buggy_cnt} != ${fixed_cnt}"
+     exit 1
+  else
+     echo "The total file is ${buggy_cnt}"
+  fi
+
+  train_cnt="$(echo "scale=0; $buggy_cnt *  0.8 / 1" | bc)"
+  eval_cnt="$(echo "scale=0; $buggy_cnt *  0.12 / 1" | bc)"
+
+  echo "BLUE value <buggy.txt, fixed.txt>"
+  ${BinPath}/multi-bleu.perl ${OutputBuggyFile} < ${OutputFixedFile}
+
+  split -l ${train_cnt} ${OutputBuggyFile} train-buggy
+  split -l ${train_cnt} ${OutputFixedFile} train-fixed
+  mv ./train-buggyaa ${OutputBuggyDir}/train-buggy.txt
+  mv ./train-fixedaa ${OutputFixedDir}/train-fixed.txt
+
+  echo "BLUE value <train-buggy.txt, train-fixed.txt>"
+  ${BinPath}/multi-bleu.perl ${OutputBuggyDir}/train-buggy.txt < ${OutputFixedDir}/train-fixed.txt
+
+  split -l ${eval_cnt} ./train-buggyab eval-buggy; rm -fr train-buggyab
+  split -l ${eval_cnt} ./train-fixedab eval-fixed; rm -fr train-fixedab
+
+  mv ./eval-buggyaa ${OutputBuggyDir}/eval-buggy.txt
+  mv ./eval-fixedaa ${OutputFixedDir}/eval-fixed.txt
+  echo "BLUE value <eval-buggy.txt, eval-fixed.txt>"
+  ${BinPath}/multi-bleu.perl ${OutputBuggyDir}/eval-buggy.txt < ${OutputFixedDir}/eval-fixed.txt
+
+  mv ./eval-buggyab ${OutputBuggyDir}/test-buggy.txt
+  mv ./eval-fixedab ${OutputFixedDir}/test-fixed.txt
+  echo "BLUE value <test-buggy.txt, test-fixed.txt>"
+  ${BinPath}/multi-bleu.perl ${OutputBuggyDir}/test-buggy.txt < ${OutputFixedDir}/test-fixed.txt
+
 }
 
 function _train() {
   echo "------------------- Training ------------------------"
-  onmt_train -config ${ConfigFile} -log_file ${LogFile}
+  onmt_train -config "${ConfigFile}" -log_file "${LogFile}"
 }
 
 function _preprocess() {
   echo "------------------- Preprocess  ------------------------"
-  onmt_preprocess -config ${ConfigFile} -log_file ${LogFile}
+  onmt_preprocess -config "${ConfigFile}" -log_file "${LogFile}"
 }
 
 function _translate() {
   echo "------------------- Translate  ------------------------"
-  beam=$1
-  onmt_translate -config ${ConfigFile} \
-                 -log_file ${LogFile} \
-                 -beam_size ${beam}
+  beam_size=$1
+  echo "Beam Size ${beam_size}"
+  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}"
+}
+
+function _evaluation() {
+    _bleu
+    _classification
 }
 
 function _inference(){
-  echo "------------------- Test Beach Search  ------------------------"
+  echo "------------------- Inference Search ------------------------"
   beam_widths=("5" "10" "15" "20" "25" "30" "35" "40" "45" "50" "100" "200")
-
   for beam_width in ${beam_widths[*]}
   do
-    echo "Beam width: $beam_width"
+    echo "******************** Beam width: $beam_width ********************"
     SECONDS=0
-    _translate ${beam_width}
+    _translate "${beam_width}"
     elapsed=$SECONDS
     echo "---------- Time report ----------"
-	  echo "Beam width: $beam_width"
 	  echo "Total seconds: $elapsed"
 
-    total=`wc -l ${TranslateSource}| awk '{print $1}'`
+    total=$(wc -l "${TranslateSource}" | awk '{print $1}')
     patches=$(($total * $beam_width))
     avg="$(echo "scale=6; $elapsed / $patches" | bc)"
     avg_bug="$(echo "scale=6; $elapsed / $total" | bc)"
@@ -191,11 +236,12 @@ function _inference(){
     echo "Total patches: $patches"
     echo "Avg patch/sec: $avg"
     echo "Avg bug/sec: $avg_bug"
-    echo "---------------------------------"
+    cp "${TranslateOutput}" "${TranslateOutput}"_"${beam_width}"
 
-    _bleu
+    _evaluation
 
-    _classification
+    rm -fr "${TranslateOutput}"
+    printf "\n\n"
   done
 }
 
@@ -214,16 +260,14 @@ case ${target} in
 
    "translate")
       _translate ${TranslateBeamSize}
-      _bleu
-      _classification
+      _evaluation
    ;;
 
    "all")
       _preprocess
       _train
       _translate ${TranslateBeamSize}
-      _bleu
-      _classification
+      _evaluation
    ;;
    "inference")
       _inference
