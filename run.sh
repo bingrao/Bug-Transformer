@@ -147,11 +147,15 @@ function _abstract() {
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
   scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "${ConfigAbstract}"
 
-  OutputBuggyDir=$(grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r' < "${ConfigAbstract}")
-  OutputFixedDir=$(grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r' < "${ConfigAbstract}")
+  echo "Generated abstract code is done, then split into train, test, eval dataset ..."
+  OutputBuggyDir=$(cat "${ConfigAbstract}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+  OutputFixedDir=$(cat "${ConfigAbstract}" | grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
 
   OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
   OutputFixedFile=${OutputFixedDir}/total/fixed.txt
+
+  [ -f "${OutputBuggyFile}" ] && echo "${OutputBuggyFile} File exist" || echo "${OutputBuggyFile} File does not exist"
+  [ -f "${OutputFixedFile}" ] && echo "${OutputFixedFile} File exist" || echo "${OutputFixedFile} File does not exist"
 
   buggy_cnt=$(wc -l < "${OutputBuggyFile}")
   fixed_cnt=$(wc -l < "${OutputFixedFile}")
@@ -160,14 +164,12 @@ function _abstract() {
   then
      echo "The total number does not match ${buggy_cnt} != ${fixed_cnt}"
      exit 1
-  else
-     echo "The total file is ${buggy_cnt}"
   fi
 
   train_cnt="$(echo "scale=0; $buggy_cnt *  0.8 / 1" | bc)"
   eval_cnt="$(echo "scale=0; $buggy_cnt *  0.12 / 1" | bc)"
 
-  echo "BLUE value <buggy.txt, fixed.txt>"
+  echo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}"
 
   split -l "${train_cnt}" "${OutputBuggyFile}" train-buggy
@@ -175,7 +177,7 @@ function _abstract() {
   mv ./train-buggyaa "${OutputBuggyDir}"/train-buggy.txt
   mv ./train-fixedaa "${OutputFixedDir}"/train-fixed.txt
 
-  echo "BLUE value <train-buggy.txt, train-fixed.txt>"
+  echo "BLUE value <train-buggy.txt, train-fixed.txt>, count: ${train_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt
 
   split -l "${eval_cnt}" ./train-buggyab eval-buggy; rm -fr train-buggyab
@@ -184,12 +186,12 @@ function _abstract() {
   mv ./eval-buggyaa "${OutputBuggyDir}"/eval-buggy.txt
   mv ./eval-fixedaa "${OutputFixedDir}"/eval-fixed.txt
 
-  echo "BLUE value <eval-buggy.txt, eval-fixed.txt>"
+  echo "BLUE value <eval-buggy.txt, eval-fixed.txt>, count: ${eval_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt
 
   mv ./eval-buggyab "${OutputBuggyDir}"/test-buggy.txt
   mv ./eval-fixedab "${OutputFixedDir}"/test-fixed.txt
-  echo "BLUE value <test-buggy.txt, test-fixed.txt>"
+  echo "BLUE value <test-buggy.txt, test-fixed.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt
 }
 

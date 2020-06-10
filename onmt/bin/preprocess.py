@@ -342,11 +342,11 @@ def preprocess(opt):
     ArgumentParser.validate_preprocess_args(opt)
     torch.manual_seed(opt.seed)
 
-    init_logger(opt.log_file)
+    logger = init_logger(opt.log_file)
 
     logger.info("The Input Parameters:")
     for key, val in vars(opt).items():
-        logger.info(f"{key} => {val}")
+        logger.info(f"[Config]: {key} => {val}")
 
     start_time = time.time()
     logger.info("Extracting features...")
