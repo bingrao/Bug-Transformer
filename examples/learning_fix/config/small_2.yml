@@ -29,10 +29,10 @@ train:
 
   decoder_type: transformer
   encoder_type: transformer
-  word_vec_size: 512
-  rnn_size: 512
+  word_vec_size: 256
+  rnn_size: 256
   layers: 6
-  transformer_ff: 2048
+  transformer_ff: 1024
   heads: 8
 
   accum_count: 8
@@ -43,7 +43,7 @@ train:
   learning_rate: 0.01
   max_grad_norm: 0.0
 
-  batch_size: 4096
+  batch_size: 2048
   batch_type: tokens
   normalization: tokens
   dropout: 0.1
@@ -55,9 +55,13 @@ train:
   param_init_glorot: 'true'
   position_encoding: 'true'
 
-  world_size: 1
+  master_port: 8001
+  world_size: 4
   gpu_ranks:
     - 0
+    - 1
+    - 2
+    - 3
 
 translate:
   work_model: translate
@@ -70,5 +74,5 @@ translate:
   beam_size: 5
   min_length: 0
   max_length: 100
-  batch_size: 4096
+  batch_size: 2048
 #  report_align: 'true'

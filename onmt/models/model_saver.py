@@ -125,10 +125,9 @@ class ModelSaver(ModelSaverBase):
             'optim': self.optim.state_dict(),
         }
 
-        # logger.info("Saving checkpoint %s_step_%d.pt" % (self.base_path, step))
-        # checkpoint_path = '%s_step_%d.pt' % (self.base_path, step)
-
-        checkpoint_path = f"{self.base_path}_step_{step}_acc_{report_stats.accuracy}_ppl_{report_stats.ppl}_xent_{report_stats.xent}.pt"
+        # http://zetcode.com/python/fstring/
+        checkpoint_path = f"model-{self.base_path}-step-{step}-acc-{report_stats.accuracy():.2f}-ppl" \
+                          f"-{report_stats.ppl():.2f}-xent-{report_stats.xent():.2f}.pt"
         logger.info(f"Saving checkpoint {checkpoint_path}")
 
         torch.save(checkpoint, checkpoint_path)

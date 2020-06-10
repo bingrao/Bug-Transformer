@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 
+
+function help() {
+     echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset[small|median|big|small_old] target[abstract|preprocess|train|translate|all|inference] configFile" >&2
+     echo "Example: Using third (or first by default) GPU to train small dataset with small_1.yml config file"
+     echo "       - export CUDA_VISIBLE_DEVICES=2; bash run.sh small train small_1.yml"
+     echo "       - bash run.sh small train small_1.yml"
+}
+
+
 if [ "$#" -ne 3 ] ; then
   echo "Missing Parameters ..."
-  echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference] config" >&2
+  help
   exit 1
 fi
 
@@ -64,7 +73,7 @@ function parse_yaml() {
    local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
    local reg=$(sed -ne "s|^\($s\):|\1|" \
           -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
-          -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $config_file |
+          -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  "$config_file" |
            awk -F$fs '{
               indent = length($1)/2;
               vname[indent] = $2;
@@ -76,7 +85,7 @@ function parse_yaml() {
                  }
               }
            }')
-   echo ${reg}
+   echo "${reg}"
 }
 
 
@@ -97,6 +106,7 @@ TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
 # The model predict output, each line is corresponding to the line in buggy code
 TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
 #echo "TranslateOutput=${TranslateOutput}"
+
 
 # The beam size for prediction
 TranslateBeamSize=10
@@ -197,6 +207,10 @@ function _abstract() {
 
 function _train() {
   echo "------------------- Training ------------------------"
+  # The numbers of GPU nodes used for training task
+  Nums_GPU=$(parse_yaml "${ConfigFile}" "train" "world_size")
+  echo "Using ${Nums_GPU} for training task ... "
+  [[ -z "${CUDA_VISIBLE_DEVICES}" ]] && export CUDA_VISIBLE_DEVICES=$(seq -s, 0 "${Nums_GPU}") || echo "exist: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
   onmt_train -config "${ConfigFile}" -log_file "${LogFile}"
 }
 
@@ -267,11 +281,8 @@ case ${target} in
    ;;
 
    "all")
-      _abstract
-      _preprocess
       _train
-      _translate ${TranslateBeamSize}
-      _evaluation
+      _inference
    ;;
 
    "inference")
@@ -280,7 +291,7 @@ case ${target} in
 
    *)
      echo "There is no match case for ${target}"
-     echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference] config" >&2
+     help
      exit 1
    ;;
 esac
