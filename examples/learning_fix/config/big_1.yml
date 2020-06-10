@@ -55,8 +55,6 @@ train:
   param_init_glorot: 'true'
   position_encoding: 'true'
 
-  accum_count: 2
-
   master_port: 8003
   world_size: 4
   gpu_ranks:
@@ -67,13 +65,12 @@ train:
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/big/big_step_50000.pt
+#  model: examples/learning_fix/data/big/big_step_50000.pt
   src: examples/learning_fix/data/big/test-buggy.txt
   tgt: examples/learning_fix/data/big/test-fixed.txt
   output: examples/learning_fix/data/big/predictions.txt
   data_type: "code"
   share_vocab: True
-  beam_size: 5
   min_length: 0
   max_length: 100
   batch_size: 2048

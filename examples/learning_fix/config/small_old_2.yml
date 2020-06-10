@@ -55,19 +55,20 @@ train:
   param_init_glorot: 'true'
   position_encoding: 'true'
 
+  master_port: 8001
   world_size: 1
   gpu_ranks:
     - 0
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/small_old/small_old_step_20000.pt
+#  model: examples/learning_fix/data/small_old/small_old_step_20000.pt
   src: examples/learning_fix/data/small_old/test-buggy.txt
   tgt: examples/learning_fix/data/small_old/test-fixed.txt
   output: examples/learning_fix/data/small_old/predictions.txt
   data_type: "code"
   share_vocab: True
-  beam_size: 5
   min_length: 0
   max_length: 100
   batch_size: 4096
+#  report_align: 'true'

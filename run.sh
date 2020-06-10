@@ -94,9 +94,12 @@ function parse_yaml() {
 
 ######### Internal Special parameters for model translate ###################
 
+ModelCheckpointPrefix=${RootPath}/$(parse_yaml "${ConfigFile}" "train" "save_model")
+
 # Test training model checkpoint path for translating
-ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
-#logInfo "ModelCheckpoint=${ModelCheckpoint}"
+#ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
+ModelCheckpoint=$(ls "${ModelCheckpointPrefix}-step-*.pt" | awk -F '-' 'BEGIN{maxv=-1000000} {score=$(NF-4); if (score > maxv) {maxv=score; max=$0}}  END{ print max}')
+
 
 # The buggy code (source) to translate task
 TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
@@ -225,8 +228,9 @@ function _preprocess() {
 function _translate() {
   logInfo "------------------- Translate  ------------------------"
   beam_size=$1
+  logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
   logInfo "Beam Size ${beam_size}"
-  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}"
+  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size} -model "${ModelCheckpoint}"
 }
 
 function _evaluation() {

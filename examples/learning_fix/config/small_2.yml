@@ -65,13 +65,12 @@ train:
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/small/small_step_50000.pt
+#  model: examples/learning_fix/data/small/small_step_50000.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
   output: examples/learning_fix/data/small/predictions.txt
   data_type: "code"
   share_vocab: True
-  beam_size: 5
   min_length: 0
   max_length: 100
   batch_size: 2048
