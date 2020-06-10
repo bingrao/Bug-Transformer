@@ -111,19 +111,19 @@ function _bleu() {
   echo "------------------- Bleu ------------------------"
 
   echo "buggy vs fixed"
-  ${BinPath}/multi-bleu.perl ${TranslateTarget} < ${TranslateSource}
+  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateSource}"
 
   echo "prediction vs fixed"
-  ${BinPath}/multi-bleu.perl ${TranslateTarget} < ${TranslateOutput}
+  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateOutput}"
 }
 
 function _classification() {
   echo "------------------- Classification ------------------------"
 
-  total=$(wc -l ${TranslateTarget} | awk '{print $1}')
+  total=$(wc -l "${TranslateTarget}" | awk '{print $1}')
   echo "Test Set: $total"
 
-  output=$(python3 ${BinPath}/prediction_classifier.py "${TranslateSource}" "${TranslateTarget}" "${TranslateOutput}" 2>&1)
+  output=$(python3 "${BinPath}"/prediction_classifier.py "${TranslateSource}" "${TranslateTarget}" "${TranslateOutput}" 2>&1)
   perf=$(awk '{print $1}' <<< "$output")
   changed=$(awk '{print $2}' <<< "$output")
   bad=$(awk '{print $3}' <<< "$output")
@@ -145,18 +145,18 @@ function _abstract() {
       exit 1
   fi
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
-  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar ${ConfigAbstract}
+  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "${ConfigAbstract}"
 
-  OutputBuggyDir=$(cat "${ConfigAbstract}"  |  grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
-  OutputFixedDir=$(cat "${ConfigAbstract}"  |  grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+  OutputBuggyDir=$(grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r' < "${ConfigAbstract}")
+  OutputFixedDir=$(grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r' < "${ConfigAbstract}")
 
   OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
   OutputFixedFile=${OutputFixedDir}/total/fixed.txt
 
-  buggy_cnt=$(cat ${OutputBuggyFile} | wc -l)
-  fixed_cnt=$(cat ${OutputFixedFile} | wc -l)
+  buggy_cnt=$(wc -l < "${OutputBuggyFile}")
+  fixed_cnt=$(wc -l < "${OutputFixedFile}")
 
-  if [ $buggy_cnt != $fixed_cnt ]
+  if [ "$buggy_cnt" != "$fixed_cnt" ]
   then
      echo "The total number does not match ${buggy_cnt} != ${fixed_cnt}"
      exit 1
@@ -168,29 +168,29 @@ function _abstract() {
   eval_cnt="$(echo "scale=0; $buggy_cnt *  0.12 / 1" | bc)"
 
   echo "BLUE value <buggy.txt, fixed.txt>"
-  ${BinPath}/multi-bleu.perl ${OutputBuggyFile} < ${OutputFixedFile}
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}"
 
-  split -l ${train_cnt} ${OutputBuggyFile} train-buggy
-  split -l ${train_cnt} ${OutputFixedFile} train-fixed
-  mv ./train-buggyaa ${OutputBuggyDir}/train-buggy.txt
-  mv ./train-fixedaa ${OutputFixedDir}/train-fixed.txt
+  split -l "${train_cnt}" "${OutputBuggyFile}" train-buggy
+  split -l "${train_cnt}" "${OutputFixedFile}" train-fixed
+  mv ./train-buggyaa "${OutputBuggyDir}"/train-buggy.txt
+  mv ./train-fixedaa "${OutputFixedDir}"/train-fixed.txt
 
   echo "BLUE value <train-buggy.txt, train-fixed.txt>"
-  ${BinPath}/multi-bleu.perl ${OutputBuggyDir}/train-buggy.txt < ${OutputFixedDir}/train-fixed.txt
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt
 
-  split -l ${eval_cnt} ./train-buggyab eval-buggy; rm -fr train-buggyab
-  split -l ${eval_cnt} ./train-fixedab eval-fixed; rm -fr train-fixedab
+  split -l "${eval_cnt}" ./train-buggyab eval-buggy; rm -fr train-buggyab
+  split -l "${eval_cnt}" ./train-fixedab eval-fixed; rm -fr train-fixedab
 
-  mv ./eval-buggyaa ${OutputBuggyDir}/eval-buggy.txt
-  mv ./eval-fixedaa ${OutputFixedDir}/eval-fixed.txt
+  mv ./eval-buggyaa "${OutputBuggyDir}"/eval-buggy.txt
+  mv ./eval-fixedaa "${OutputFixedDir}"/eval-fixed.txt
+
   echo "BLUE value <eval-buggy.txt, eval-fixed.txt>"
-  ${BinPath}/multi-bleu.perl ${OutputBuggyDir}/eval-buggy.txt < ${OutputFixedDir}/eval-fixed.txt
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt
 
-  mv ./eval-buggyab ${OutputBuggyDir}/test-buggy.txt
-  mv ./eval-fixedab ${OutputFixedDir}/test-fixed.txt
+  mv ./eval-buggyab "${OutputBuggyDir}"/test-buggy.txt
+  mv ./eval-fixedab "${OutputFixedDir}"/test-fixed.txt
   echo "BLUE value <test-buggy.txt, test-fixed.txt>"
-  ${BinPath}/multi-bleu.perl ${OutputBuggyDir}/test-buggy.txt < ${OutputFixedDir}/test-fixed.txt
-
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt
 }
 
 function _train() {
@@ -228,7 +228,7 @@ function _inference(){
 	  echo "Total seconds: $elapsed"
 
     total=$(wc -l "${TranslateSource}" | awk '{print $1}')
-    patches=$(($total * $beam_width))
+    patches=$((total * beam_width))
     avg="$(echo "scale=6; $elapsed / $patches" | bc)"
     avg_bug="$(echo "scale=6; $elapsed / $total" | bc)"
 
@@ -236,6 +236,7 @@ function _inference(){
     echo "Total patches: $patches"
     echo "Avg patch/sec: $avg"
     echo "Avg bug/sec: $avg_bug"
+
     cp "${TranslateOutput}" "${TranslateOutput}"_"${beam_width}"
 
     _evaluation
@@ -269,9 +270,11 @@ case ${target} in
       _translate ${TranslateBeamSize}
       _evaluation
    ;;
+
    "inference")
       _inference
    ;;
+
    *)
      echo "There is no match case for ${target}"
      echo "Usage: $0 dataset[small|small_old|median] target[abstract|preprocess|train|translate|all|inference] config" >&2
