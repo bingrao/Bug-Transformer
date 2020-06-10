@@ -267,6 +267,7 @@ case ${target} in
    ;;
 
    "all")
+      _abstract
       _preprocess
       _train
       _translate ${TranslateBeamSize}
