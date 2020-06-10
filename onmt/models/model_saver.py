@@ -126,7 +126,7 @@ class ModelSaver(ModelSaverBase):
         }
 
         # http://zetcode.com/python/fstring/
-        checkpoint_path = f"model-{self.base_path}-step-{step}-acc-{report_stats.accuracy():.2f}-ppl" \
+        checkpoint_path = f"{self.base_path}-step-{step}-acc-{report_stats.accuracy():.2f}-ppl" \
                           f"-{report_stats.ppl():.2f}-xent-{report_stats.xent():.2f}.pt"
         logger.info(f"Saving checkpoint {checkpoint_path}")
 
