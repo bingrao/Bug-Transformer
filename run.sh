@@ -8,7 +8,6 @@ function help() {
      echo "       - bash run.sh small train small_1.yml"
 }
 
-
 if [ "$#" -ne 3 ] ; then
   echo "Missing Parameters ..."
   help
@@ -40,12 +39,16 @@ CurrentDate=$(date +%F)
 # Log file
 LogFile=${LogPath}/${prefix}-${CurrentDate}.log
 
+function logInfo() {
+    echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
+}
+
 # Config files for model data preprocess, train, translate
 ConfigFile=${ConfigPath}/${configFile}
 if [ -f "$ConfigFile" ]; then
-    echo "Loading config from $ConfigFile."
+    logInfo "Loading config from $ConfigFile."
 else
-    echo "Config file $ConfigFile does not exist."
+    logInfo "Config file $ConfigFile does not exist."
     exit 1
 fi
 
@@ -93,24 +96,24 @@ function parse_yaml() {
 
 # Test training model checkpoint path for translating
 ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
-#echo "ModelCheckpoint=${ModelCheckpoint}"
+#logInfo "ModelCheckpoint=${ModelCheckpoint}"
 
 # The buggy code (source) to translate task
 TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
-#echo "TranslateSource=${TranslateSource}"
+#logInfo "TranslateSource=${TranslateSource}"
 
 # The fixed code (target) to translate task
 TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
-#echo "TranslateTarget=${TranslateTarget}"
+#logInfo "TranslateTarget=${TranslateTarget}"
 
 # The model predict output, each line is corresponding to the line in buggy code
 TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
-#echo "TranslateOutput=${TranslateOutput}"
+#logInfo "TranslateOutput=${TranslateOutput}"
 
 
 # The beam size for prediction
 TranslateBeamSize=10
-#echo "TranslateBeamSize=${TranslateBeamSize}"
+#logInfo "TranslateBeamSize=${TranslateBeamSize}"
 
 #####################################################################
 ########################### Helper functions  #######################
@@ -118,20 +121,20 @@ TranslateBeamSize=10
 
 
 function _bleu() {
-  echo "------------------- Bleu ------------------------"
+  logInfo "------------------- Bleu ------------------------"
 
-  echo "buggy vs fixed"
+  logInfo "buggy vs fixed"
   "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateSource}"
 
-  echo "prediction vs fixed"
+  logInfo "prediction vs fixed"
   "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateOutput}"
 }
 
 function _classification() {
-  echo "------------------- Classification ------------------------"
+  logInfo "------------------- Classification ------------------------"
 
   total=$(wc -l "${TranslateTarget}" | awk '{print $1}')
-  echo "Test Set: $total"
+  logInfo "Test Set: $total"
 
   output=$(python3 "${BinPath}"/prediction_classifier.py "${TranslateSource}" "${TranslateTarget}" "${TranslateOutput}" 2>&1)
   perf=$(awk '{print $1}' <<< "$output")
@@ -139,47 +142,47 @@ function _classification() {
   bad=$(awk '{print $3}' <<< "$output")
   perf_perc="$(echo "scale=2; $perf * 100 / $total" | bc)"
 
-  echo "Perf: $perf ($perf_perc%)"
-  echo "Pot : $changed"
-  echo "Bad : $bad"
+  logInfo "Perf: $perf ($perf_perc%)"
+  logInfo "Pot : $changed"
+  logInfo "Bad : $bad"
 }
 
 function _abstract() {
-  echo "------------------- Code Abstract ------------------------"
+  logInfo "------------------- Code Abstract ------------------------"
   # Config file for scala application to generate abstract code
   ConfigAbstract=${ConfigPath}/application_${dataset}.conf
   if [ -f "$ConfigAbstract" ]; then
-      echo "$ConfigAbstract exists."
+      logInfo "$ConfigAbstract exists."
   else
-      echo "$ConfigAbstract does not exist."
+      logInfo "$ConfigAbstract does not exist."
       exit 1
   fi
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
   scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "${ConfigAbstract}"
 
-  echo "Generated abstract code is done, then split into train, test, eval dataset ..."
+  logInfo "Generated abstract code is done, then split into train, test, eval dataset ..."
   OutputBuggyDir=$(cat "${ConfigAbstract}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
   OutputFixedDir=$(cat "${ConfigAbstract}" | grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
 
   OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
   OutputFixedFile=${OutputFixedDir}/total/fixed.txt
 
-  [ -f "${OutputBuggyFile}" ] && echo "${OutputBuggyFile} File exist" || echo "${OutputBuggyFile} File does not exist"
-  [ -f "${OutputFixedFile}" ] && echo "${OutputFixedFile} File exist" || echo "${OutputFixedFile} File does not exist"
+  [ -f "${OutputBuggyFile}" ] && logInfo "${OutputBuggyFile} File exist" || logInfo "${OutputBuggyFile} File does not exist"
+  [ -f "${OutputFixedFile}" ] && logInfo "${OutputFixedFile} File exist" || logInfo "${OutputFixedFile} File does not exist"
 
   buggy_cnt=$(wc -l < "${OutputBuggyFile}")
   fixed_cnt=$(wc -l < "${OutputFixedFile}")
 
   if [ "$buggy_cnt" != "$fixed_cnt" ]
   then
-     echo "The total number does not match ${buggy_cnt} != ${fixed_cnt}"
+     logInfo "The total number does not match ${buggy_cnt} != ${fixed_cnt}"
      exit 1
   fi
 
   train_cnt="$(echo "scale=0; $buggy_cnt *  0.8 / 1" | bc)"
   eval_cnt="$(echo "scale=0; $buggy_cnt *  0.12 / 1" | bc)"
 
-  echo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
+  logInfo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}"
 
   split -l "${train_cnt}" "${OutputBuggyFile}" train-buggy
@@ -187,7 +190,7 @@ function _abstract() {
   mv ./train-buggyaa "${OutputBuggyDir}"/train-buggy.txt
   mv ./train-fixedaa "${OutputFixedDir}"/train-fixed.txt
 
-  echo "BLUE value <train-buggy.txt, train-fixed.txt>, count: ${train_cnt}"
+  logInfo "BLUE value <train-buggy.txt, train-fixed.txt>, count: ${train_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt
 
   split -l "${eval_cnt}" ./train-buggyab eval-buggy; rm -fr train-buggyab
@@ -196,33 +199,33 @@ function _abstract() {
   mv ./eval-buggyaa "${OutputBuggyDir}"/eval-buggy.txt
   mv ./eval-fixedaa "${OutputFixedDir}"/eval-fixed.txt
 
-  echo "BLUE value <eval-buggy.txt, eval-fixed.txt>, count: ${eval_cnt}"
+  logInfo "BLUE value <eval-buggy.txt, eval-fixed.txt>, count: ${eval_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt
 
   mv ./eval-buggyab "${OutputBuggyDir}"/test-buggy.txt
   mv ./eval-fixedab "${OutputFixedDir}"/test-fixed.txt
-  echo "BLUE value <test-buggy.txt, test-fixed.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
+  logInfo "BLUE value <test-buggy.txt, test-fixed.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt
 }
 
 function _train() {
-  echo "------------------- Training ------------------------"
+  logInfo "------------------- Training ------------------------"
   # The numbers of GPU nodes used for training task
   Nums_GPU=$(parse_yaml "${ConfigFile}" "train" "world_size")
-  echo "Using ${Nums_GPU} for training task ... "
+  logInfo "Using ${Nums_GPU} for training task ... "
   [[ -z "${CUDA_VISIBLE_DEVICES}" ]] && export CUDA_VISIBLE_DEVICES=$(seq -s, 0 "${Nums_GPU}") || echo "exist: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
   onmt_train -config "${ConfigFile}" -log_file "${LogFile}"
 }
 
 function _preprocess() {
-  echo "------------------- Preprocess  ------------------------"
+  logInfo "------------------- Preprocess  ------------------------"
   onmt_preprocess -config "${ConfigFile}" -log_file "${LogFile}"
 }
 
 function _translate() {
-  echo "------------------- Translate  ------------------------"
+  logInfo "------------------- Translate  ------------------------"
   beam_size=$1
-  echo "Beam Size ${beam_size}"
+  logInfo "Beam Size ${beam_size}"
   onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}"
 }
 
@@ -232,33 +235,33 @@ function _evaluation() {
 }
 
 function _inference(){
-  echo "------------------- Inference Search ------------------------"
+  logInfo "------------------- Inference Search ------------------------"
   beam_widths=("5" "10" "15" "20" "25" "30" "35" "40" "45" "50" "100" "200")
   for beam_width in ${beam_widths[*]}
   do
-    echo "******************** Beam width: $beam_width ********************"
+    logInfo "******************** Beam width: $beam_width ********************"
     SECONDS=0
     _translate "${beam_width}"
     elapsed=$SECONDS
-    echo "---------- Time report ----------"
-	  echo "Total seconds: $elapsed"
+    logInfo "---------- Time report ----------"
+	  logInfo "Total seconds: $elapsed"
 
     total=$(wc -l "${TranslateSource}" | awk '{print $1}')
     patches=$((total * beam_width))
     avg="$(echo "scale=6; $elapsed / $patches" | bc)"
     avg_bug="$(echo "scale=6; $elapsed / $total" | bc)"
 
-    echo "Total bugs: $total"
-    echo "Total patches: $patches"
-    echo "Avg patch/sec: $avg"
-    echo "Avg bug/sec: $avg_bug"
+    logInfo "Total bugs: $total"
+    logInfo "Total patches: $patches"
+    logInfo "Avg patch/sec: $avg"
+    logInfo "Avg bug/sec: $avg_bug"
 
     cp "${TranslateOutput}" "${TranslateOutput}"_"${beam_width}"
 
     _evaluation
 
     rm -fr "${TranslateOutput}"
-    printf "\n\n"
+    printf "\n\n" | tee -a "${LogFile}"
   done
 }
 
@@ -290,7 +293,7 @@ case ${target} in
    ;;
 
    *)
-     echo "There is no match case for ${target}"
+     logInfo "There is no match case for ${target}"
      help
      exit 1
    ;;
