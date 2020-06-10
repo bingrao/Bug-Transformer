@@ -17,7 +17,7 @@ fi
 dataset=$1
 target=$2
 configFile=$3
-prefix="${dataset}-$target-$(echo ${configFile} | cut -d'.' -f1)"
+prefix="${dataset}-$target-$(echo "${configFile}" | cut -d'.' -f1)"
 
 ############################# Root envs ############################
 RootPath=$(pwd)
@@ -37,7 +37,7 @@ CurrentDate=$(date +%F)
 
 ########################### Project Parameters #######################
 # Log file
-LogFile=${LogPath}/${prefix}-${CurrentDate}.log
+LogFile=${LogPath}/${CurrentDate}-${prefix}.log
 
 function logInfo() {
     echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
@@ -71,7 +71,7 @@ function parse_and_print_yaml {
 
 function parse_yaml() {
    local config_file=$1
-   local prefix=$2
+   local target=$2
    local parameter=$3
    local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
    local reg=$(sed -ne "s|^\($s\):|\1|" \
@@ -83,7 +83,7 @@ function parse_yaml() {
               for (i in vname) {if (i > indent) {delete vname[i]}}
               if (length($3) > 0) {
                  vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])}
-                 if (vn == "'$prefix'" && $2 == "'$parameter'"){
+                 if (vn == "'$target'" && $2 == "'$parameter'"){
                    print($3);
                  }
               }
@@ -112,7 +112,7 @@ TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
 
 
 # The beam size for prediction
-TranslateBeamSize=10
+TranslateBeamSize=5
 #logInfo "TranslateBeamSize=${TranslateBeamSize}"
 
 #####################################################################
@@ -213,7 +213,7 @@ function _train() {
   # The numbers of GPU nodes used for training task
   Nums_GPU=$(parse_yaml "${ConfigFile}" "train" "world_size")
   logInfo "Using ${Nums_GPU} for training task ... "
-  [[ -z "${CUDA_VISIBLE_DEVICES}" ]] && export CUDA_VISIBLE_DEVICES=$(seq -s, 0 "${Nums_GPU}") || echo "exist: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
+  [[ -z "${CUDA_VISIBLE_DEVICES}" ]] && export CUDA_VISIBLE_DEVICES=$(seq -s, 0 "${Nums_GPU}") || logInfo "exist: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
   onmt_train -config "${ConfigFile}" -log_file "${LogFile}"
 }
 
