@@ -18,7 +18,7 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  save_model: examples/learning_fix/data/small/small
+  save_model: examples/learning_fix/data/small/2/small
   save_checkpoint_steps: 5000
   keep_checkpoint: 10
   seed: 3435
@@ -68,7 +68,7 @@ translate:
 #  model: examples/learning_fix/data/small/small_step_50000.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
-  output: examples/learning_fix/data/small/predictions.txt
+  output: examples/learning_fix/data/small/2/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0

@@ -18,7 +18,7 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small_old/small_old
-  save_model: examples/learning_fix/data/small_old/small_old
+  save_model: examples/learning_fix/data/small_old/7/small_old
   save_checkpoint_steps: 1000
   keep_checkpoint: 10
   seed: 3435

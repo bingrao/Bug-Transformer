@@ -18,7 +18,7 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/median/median
-  save_model: examples/learning_fix/data/median/median
+  save_model: examples/learning_fix/data/median/1/median
   save_checkpoint_steps: 5000
   keep_checkpoint: 10
   seed: 3435
@@ -68,7 +68,7 @@ translate:
 #  model: examples/learning_fix/data/median/median_step_50000.pt
   src: examples/learning_fix/data/median/test-buggy.txt
   tgt: examples/learning_fix/data/median/test-fixed.txt
-  output: examples/learning_fix/data/median/predictions.txt
+  output: examples/learning_fix/data/median/1/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0

@@ -12,35 +12,35 @@ preprocess:
   num_threads: 10
   overwrite: True
   share_vocab: True
-  pos_vec_size: 256
+  pos_vec_size: 512
   data_type: "code"
 
 train:
   work_model: train
   data: examples/learning_fix/data/big/big
-  save_model: examples/learning_fix/data/big/1/big
-  save_checkpoint_steps: 5000
+  save_model: examples/learning_fix/data/big/2/big
+  save_checkpoint_steps: 10000
   keep_checkpoint: 10
   seed: 3435
-  train_steps: 50000
+  train_steps: 100000
   valid_steps: 10000
   warmup_steps: 4000
-  report_every: 1000
+  report_every: 5000
 
   decoder_type: transformer
   encoder_type: transformer
-  word_vec_size: 256
-  rnn_size: 256
+  word_vec_size: 512
+  rnn_size: 512
   layers: 6
-  transformer_ff: 1024
+  transformer_ff: 2048
   heads: 8
 
   accum_count: 8
   optim: adam
   adam_beta1: 0.9
-  adam_beta2: 0.998
+  adam_beta2: 0.98
   decay_method: noam
-  learning_rate: 0.01
+  learning_rate: 0.001
   max_grad_norm: 0.0
 
   batch_size: 2048
@@ -51,7 +51,7 @@ train:
 
   max_generator_batches: 2
 
-  param_init: 0.0
+  param_init: 0.1
   param_init_glorot: 'true'
   position_encoding: 'true'
 
@@ -68,7 +68,7 @@ translate:
 #  model: examples/learning_fix/data/big/big_step_50000.pt
   src: examples/learning_fix/data/big/test-buggy.txt
   tgt: examples/learning_fix/data/big/test-fixed.txt
-  output: examples/learning_fix/data/big/1/predictions.txt
+  output: examples/learning_fix/data/big/2/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0

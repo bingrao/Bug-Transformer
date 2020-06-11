@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 
 
+############################# Root envs ############################
+RootPath=$(pwd)
+ProjectPath=${RootPath}/examples/learning_fix
+ConfigPath=${ProjectPath}/config; [ -d "$ConfigPath" ] || mkdir -p "$ConfigPath"
+BinPath=${ProjectPath}/bin; [ -d "$BinPath" ] || mkdir -p "$BinPath"
+LogPath=${ProjectPath}/logs; [ -d "$LogPath" ] || mkdir -p "$LogPath"
+DataPath=${ProjectPath}/data; [ -d "$DataPath" ] || mkdir -p "$DataPath"
+CurrentDate=$(date +%F)
+
 function help() {
      echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset[small|median|big|small_old] target[abstract|preprocess|train|translate|all|inference] configFile" >&2
      echo "Example: Using third (or first by default) GPU to train small dataset with small_1.yml config file"
@@ -14,28 +23,20 @@ if [ "$#" -ne 3 ] ; then
   exit 1
 fi
 
+########################### Project Parameters #######################
 dataset=$1
 target=$2
 configFile=$3
 prefix="${dataset}-$target-$(echo "${configFile}" | cut -d'.' -f1)"
 
-############################# Root envs ############################
-RootPath=$(pwd)
-ProjectPath=${RootPath}/examples/learning_fix
-ConfigPath=${ProjectPath}/config
-BinPath=${ProjectPath}/bin
-LogPath=${ProjectPath}/logs
-DataPath=${ProjectPath}/data
+echo "[$(date +"%F %T,%3N") INFO] Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
+$(echo "$configFile" | grep -Eq  '*_[0-9]+\.yml'$) || exit 1
+echo "[$(date +"%F %T,%3N") INFO] Config file name is good"
 
+config_index=$(echo "${configFile}" |  tr -dc '0-9')
 
-[ -d $ConfigPath ] || mkdir -p $ConfigPath
-[ -d $BinPath ] || mkdir -p $BinPath
-[ -d $LogPath ] || mkdir -p $LogPath
-[ -d $DataPath ] || mkdir -p $DataPath
+DataOutputPath=${DataPath}/${dataset}/${config_index}; [ -d "$DataOutputPath" ] || mkdir -p "$DataOutputPath"
 
-CurrentDate=$(date +%F)
-
-########################### Project Parameters #######################
 # Log file
 LogFile=${LogPath}/${CurrentDate}-${prefix}.log
 
@@ -97,18 +98,16 @@ function parse_yaml() {
 # The buggy code (source) to translate task
 TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
 
-
 # The fixed code (target) to translate task
 TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
 
-
 # The model predict output, each line is corresponding to the line in buggy code
-TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
+[ -z "$(parse_yaml "${ConfigFile}" "translate" "output")" ] && TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output") || TranslateOutput=${DataOutputPath}/predictions.txt
 
-
+[ -z "$(parse_yaml "${ConfigFile}" "train" "save_model")" ] && ModelCheckpointPrefix=${RootPath}/"$(parse_yaml "${ConfigFile}" "train" "save_model")" || ModelCheckpointPrefix=${DataOutputPath}/${dataset}
 
 # The beam size for prediction
-TranslateBeamSize=5
+TranslateBeamSize=1
 #logInfo "TranslateBeamSize=${TranslateBeamSize}"
 
 #####################################################################
@@ -135,8 +134,11 @@ function _abstract() {
   OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
   OutputFixedFile=${OutputFixedDir}/total/fixed.txt
 
-  [ -f "${OutputBuggyFile}" ] && logInfo "${OutputBuggyFile} File exist" || logInfo "${OutputBuggyFile} File does not exist"
-  [ -f "${OutputFixedFile}" ] && logInfo "${OutputFixedFile} File exist" || logInfo "${OutputFixedFile} File does not exist"
+  logInfo "Check ${OutputBuggyFile} if exist"
+  [ -f "${OutputBuggyFile}" ] || exit 1
+
+  logInfo "Check ${OutputFixedFile} if exist"
+  [ -f "${OutputFixedFile}" ] || exit 1
 
   buggy_cnt=$(wc -l < "${OutputBuggyFile}")
   fixed_cnt=$(wc -l < "${OutputFixedFile}")
@@ -182,7 +184,8 @@ function _train() {
   Nums_GPU=$(parse_yaml "${ConfigFile}" "train" "world_size")
   logInfo "Using ${Nums_GPU} for training task ... "
   [[ -z "${CUDA_VISIBLE_DEVICES}" ]] && export CUDA_VISIBLE_DEVICES=$(seq -s, 0 "${Nums_GPU}") || logInfo "exist: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
-  onmt_train -config "${ConfigFile}" -log_file "${LogFile}"
+  logInfo "The checkpoint will be saved with prefix ${ModelCheckpointPrefix}"
+  onmt_train -save_model "${ModelCheckpointPrefix}" -config "${ConfigFile}" -log_file "${LogFile}"
 }
 
 function _preprocess() {
@@ -196,11 +199,12 @@ function _translate() {
 
   logInfo "Beam Size ${beam_size}"
 
+  # Test if checkpoint is set up in the config file
   if [ -z "$(parse_yaml "${ConfigFile}" "translate" "model")" ]
   then
-      # Test training model checkpoint path for translating
       logInfo "The Checkpoint model is not be set up in ${ConfigFile}, then search best one."
-      ModelCheckpointPrefix=${RootPath}/$(parse_yaml "${ConfigFile}" "train" "save_model")
+
+      # NF means the number of parameters in awk command
       ModelCheckpoint=$(ls ${ModelCheckpointPrefix}-step-*.pt |
           awk -F '-' 'BEGIN{maxv=-1000000} {score=$(NF-4); if (score > maxv) {maxv=score; max=$0}}  END{ print max}')
   else
@@ -208,7 +212,8 @@ function _translate() {
   fi
 
   logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
-  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -model "${ModelCheckpoint}"
+  logInfo "The output prediction will be save to ${TranslateOutput}"
+  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
 }
 
 function _evaluation() {
@@ -238,7 +243,7 @@ function _evaluation() {
 
 function _inference(){
   logInfo "------------------- Inference Search ------------------------"
-  beam_widths=("5" "10" "15" "20" "25" "30" "35" "40" "45" "50" "100" "200")
+  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50" "100" "200")
   for beam_width in ${beam_widths[*]}
   do
     logInfo "******************** Beam width: $beam_width ********************"
