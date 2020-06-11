@@ -94,24 +94,17 @@ function parse_yaml() {
 
 ######### Internal Special parameters for model translate ###################
 
-ModelCheckpointPrefix=${RootPath}/$(parse_yaml "${ConfigFile}" "train" "save_model")
-
-# Test training model checkpoint path for translating
-#ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
-ModelCheckpoint=$(ls "${ModelCheckpointPrefix}-step-*.pt" | awk -F '-' 'BEGIN{maxv=-1000000} {score=$(NF-4); if (score > maxv) {maxv=score; max=$0}}  END{ print max}')
-
-
 # The buggy code (source) to translate task
 TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
-#logInfo "TranslateSource=${TranslateSource}"
+
 
 # The fixed code (target) to translate task
 TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
-#logInfo "TranslateTarget=${TranslateTarget}"
+
 
 # The model predict output, each line is corresponding to the line in buggy code
 TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
-#logInfo "TranslateOutput=${TranslateOutput}"
+
 
 
 # The beam size for prediction
@@ -121,34 +114,6 @@ TranslateBeamSize=5
 #####################################################################
 ########################### Helper functions  #######################
 #####################################################################
-
-
-function _bleu() {
-  logInfo "------------------- Bleu ------------------------"
-
-  logInfo "buggy vs fixed"
-  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateSource}"
-
-  logInfo "prediction vs fixed"
-  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateOutput}"
-}
-
-function _classification() {
-  logInfo "------------------- Classification ------------------------"
-
-  total=$(wc -l "${TranslateTarget}" | awk '{print $1}')
-  logInfo "Test Set: $total"
-
-  output=$(python3 "${BinPath}"/prediction_classifier.py "${TranslateSource}" "${TranslateTarget}" "${TranslateOutput}" 2>&1)
-  perf=$(awk '{print $1}' <<< "$output")
-  changed=$(awk '{print $2}' <<< "$output")
-  bad=$(awk '{print $3}' <<< "$output")
-  perf_perc="$(echo "scale=2; $perf * 100 / $total" | bc)"
-
-  logInfo "Perf: $perf ($perf_perc%)"
-  logInfo "Pot : $changed"
-  logInfo "Bad : $bad"
-}
 
 function _abstract() {
   logInfo "------------------- Code Abstract ------------------------"
@@ -186,7 +151,7 @@ function _abstract() {
   eval_cnt="$(echo "scale=0; $buggy_cnt *  0.12 / 1" | bc)"
 
   logInfo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}"
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}" | tee -a "${LogFile}"
 
   split -l "${train_cnt}" "${OutputBuggyFile}" train-buggy
   split -l "${train_cnt}" "${OutputFixedFile}" train-fixed
@@ -194,7 +159,7 @@ function _abstract() {
   mv ./train-fixedaa "${OutputFixedDir}"/train-fixed.txt
 
   logInfo "BLUE value <train-buggy.txt, train-fixed.txt>, count: ${train_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt | tee -a "${LogFile}"
 
   split -l "${eval_cnt}" ./train-buggyab eval-buggy; rm -fr train-buggyab
   split -l "${eval_cnt}" ./train-fixedab eval-fixed; rm -fr train-fixedab
@@ -203,12 +168,12 @@ function _abstract() {
   mv ./eval-fixedaa "${OutputFixedDir}"/eval-fixed.txt
 
   logInfo "BLUE value <eval-buggy.txt, eval-fixed.txt>, count: ${eval_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt | tee -a "${LogFile}"
 
   mv ./eval-buggyab "${OutputBuggyDir}"/test-buggy.txt
   mv ./eval-fixedab "${OutputFixedDir}"/test-fixed.txt
   logInfo "BLUE value <test-buggy.txt, test-fixed.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt | tee -a "${LogFile}"
 }
 
 function _train() {
@@ -228,14 +193,47 @@ function _preprocess() {
 function _translate() {
   logInfo "------------------- Translate  ------------------------"
   beam_size=$1
-  logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
+
   logInfo "Beam Size ${beam_size}"
-  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size} -model "${ModelCheckpoint}"
+
+  if [ -z "$(parse_yaml "${ConfigFile}" "translate" "model")" ]
+  then
+      # Test training model checkpoint path for translating
+      logInfo "The Checkpoint model is not be set up in ${ConfigFile}, then search best one."
+      ModelCheckpointPrefix=${RootPath}/$(parse_yaml "${ConfigFile}" "train" "save_model")
+      ModelCheckpoint=$(ls ${ModelCheckpointPrefix}-step-*.pt |
+          awk -F '-' 'BEGIN{maxv=-1000000} {score=$(NF-4); if (score > maxv) {maxv=score; max=$0}}  END{ print max}')
+  else
+      ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
+  fi
+
+  logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
+  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -model "${ModelCheckpoint}"
 }
 
 function _evaluation() {
-    _bleu
-    _classification
+  logInfo "------------------- Bleu ------------------------"
+
+  logInfo "buggy vs fixed"
+  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateSource}" | tee -a "${LogFile}"
+
+  logInfo "prediction vs fixed"
+  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateOutput}" | tee -a "${LogFile}"
+
+  logInfo "------------------- Classification ------------------------"
+
+  total=$(wc -l "${TranslateTarget}" | awk '{print $1}')
+  logInfo "Test Set: $total"
+
+  output=$(python3 "${BinPath}"/prediction_classifier.py "${TranslateSource}" "${TranslateTarget}" "${TranslateOutput}" 2>&1)
+  perf=$(awk '{print $1}' <<< "$output")
+  changed=$(awk '{print $2}' <<< "$output")
+  bad=$(awk '{print $3}' <<< "$output")
+  perf_perc="$(echo "scale=2; $perf * 100 / $total" | bc)"
+
+  logInfo "Perf: $perf ($perf_perc%)"
+  logInfo "Pot : $changed"
+  logInfo "Bad : $bad"
 }
 
 function _inference(){
