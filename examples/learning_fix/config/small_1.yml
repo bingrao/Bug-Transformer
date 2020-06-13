@@ -65,7 +65,7 @@ train:
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/small/1/small_step_50000.pt
+#  model: examples/learning_fix/data/small/1/small_step_50000.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
   output: examples/learning_fix/data/small/1/predictions.txt
