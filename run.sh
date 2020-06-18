@@ -39,6 +39,7 @@ DataOutputPath=${DataPath}/${dataset}/${config_index}; [ -d "$DataOutputPath" ] 
 
 # Log file
 LogFile=${LogPath}/${CurrentDate}-${prefix}.log
+#TensorboardDir=${LogPath}/${CurrentDate}-${prefix}; [ -d "$TensorboardDir" ] || mkdir -p "$TensorboardDir"
 
 function logInfo() {
     echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
@@ -186,6 +187,7 @@ function _train() {
   [[ -z "${CUDA_VISIBLE_DEVICES}" ]] && export CUDA_VISIBLE_DEVICES=$(seq -s, 0 "${Nums_GPU}") || logInfo "exist: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
   logInfo "The checkpoint will be saved with prefix ${ModelCheckpointPrefix}"
   onmt_train -save_model "${ModelCheckpointPrefix}" -config "${ConfigFile}" -log_file "${LogFile}"
+  #-tensorboard -tensorboard_log_dir "${TensorboardDir}"
 }
 
 function _preprocess() {
