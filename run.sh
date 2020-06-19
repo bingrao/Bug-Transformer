@@ -216,6 +216,11 @@ function _translate() {
   logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
   logInfo "The output prediction will be save to ${TranslateOutput}"
   onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
+
+  # Backup all predictions txt
+  step=$(echo "${ModelCheckpoint}" | awk -F'/' '{print $NF}' | cut -d'-' -f 3)
+  DataOutputStepPath=${DataOutputPath}/${step}; [ -d "$DataOutputStepPath" ] || mkdir -p "$DataOutputStepPath"
+  cp "${TranslateOutput}" "${DataOutputStepPath}"/predictions_"${beam_width}".txt
 }
 
 function _evaluation() {
@@ -264,8 +269,6 @@ function _inference(){
     logInfo "Total patches: $patches"
     logInfo "Avg patch/sec: $avg"
     logInfo "Avg bug/sec: $avg_bug"
-
-    cp "${TranslateOutput}" "${TranslateOutput}"_"${beam_width}"
 
     _evaluation
 
