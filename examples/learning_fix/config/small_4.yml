@@ -18,8 +18,9 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  save_model: examples/learning_fix/data/small/3/small
-  train_from: examples/learning_fix/data/small/3/small-step-80000.pt
+  save_model: examples/learning_fix/data/small/4/small
+  
+  train_from: examples/learning_fix/data/small/4/small-step-80000.pt
   save_checkpoint_steps: 5000
   keep_checkpoint: 10
   seed: 3435
@@ -33,8 +34,8 @@ train:
   word_vec_size: 64
   rnn_size: 64
   layers: 6
-  transformer_ff: 256
-  heads: 8
+  transformer_ff: 128
+  heads: 4
 
   accum_count: 8
   optim: adam
@@ -65,7 +66,7 @@ translate:
   work_model: translate
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
-  output: examples/learning_fix/data/small/3/predictions.txt
+  output: examples/learning_fix/data/small/4/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
