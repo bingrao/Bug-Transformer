@@ -14,11 +14,11 @@ export CUDA_VISIBLE_DEVICES=$2
 case ${dataset} in
    "small")
       set -x
-      onmt_train -config examples/learning_fix/config/small_train_1G_1_yao_1.yml -world_size 1 -gpu_ranks 0 -log_file ${ProjectLog}
+      onmt_train -config examples/learning_fix/config/small_train_1G_1_yao_8.yml -world_size 1 -gpu_ranks 0 -log_file ${ProjectLog}
       ;;
    "small_old")
       set -x
-      onmt_train -config examples/learning_fix/config/small_train_1G_2_yao_1.yml -world_size 1 -gpu_ranks 0 -log_file ${ProjectLog}
+      onmt_train -config examples/learning_fix/config/small_train_1G_2_yao_8.yml -world_size 1 -gpu_ranks 0 -log_file ${ProjectLog}
       ;;
    "small_tree")
       set -x

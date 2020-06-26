@@ -6,15 +6,15 @@ if [ "$#" -ne 1 ] ; then
   exit 1
 fi
 
-dataset="small_old"
+dataset="small"
 target=$1
 
-#export CUDA_VISIBLE_DEVICES=0,1,2,3
+
 ############################# Root envs ############################
 RootPath=`pwd`/examples/learning_fix
 ConfigPath=${RootPath}/config
 BinPath=${RootPath}/bin
-LogPath=${RootPath}/logs
+LogPath=${RootPath}/logs/yao
 DataPath=${RootPath}/data
 
 
@@ -34,7 +34,7 @@ LogFile=${LogPath}/${dataset}-${target}-${CurrentDate}.log
 ConfigAbstract=${ConfigPath}/application_${dataset}.conf
 
 # Config files for model data preprocess, train, translate
-ConfigFile=${ConfigPath}/${dataset}_1.yml
+ConfigFile=${ConfigPath}/yao/${dataset}_yao_3.yml
 
 ######### Special parameters for model translate ###################
 
@@ -48,7 +48,7 @@ TranslateSource=${DataPath}/${dataset}/test-buggy.txt
 TranslateTarget=${DataPath}/${dataset}/test-fixed.txt
 
 # The model predict output, each line is corresponding to the line in buggy code
-TranslateOutput=${DataPath}/${dataset}/predictions.txt
+TranslateOutput=${DataPath}/yao/${dataset}/predictions.txt
 
 # The beam size for prediction
 TranslateBeamSize=10
@@ -95,7 +95,7 @@ function _abstract() {
 
 function _train() {
   echo "------------------- Training ------------------------"
-  onmt_train -config ${ConfigFile}  #-log_file ${LogFile}
+  onmt_train -config ${ConfigFile} -log_file ${LogFile}
 }
 
 function _preprocess() {
