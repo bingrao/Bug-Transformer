@@ -40,11 +40,12 @@ def model_opts(parser):
     group.add('--share_decoder_embeddings', '-share_decoder_embeddings',
               action='store_true',
               help="Use a shared weight matrix for the input and "
-                   "output word  embeddings in the decoder.")
+                   "output word embeddings in the decoder.")
     group.add('--share_embeddings', '-share_embeddings', action='store_true',
               help="Share the word embeddings between encoder "
                    "and decoder. Need to use shared dictionary for this "
                    "option.")
+
     group.add('--position_encoding', '-position_encoding', action='store_true',
               help="Use a sin to mark relative words positions. "
                    "Necessary for non-RNN style models.")

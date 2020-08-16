@@ -22,7 +22,12 @@ def train(opt):
     ArgumentParser.update_model_opts(opt)
     ArgumentParser.validate_model_opts(opt)
 
+    logger = init_logger(opt.log_file)
     set_random_seed(opt.seed, False)
+
+    logger.info("The Input Parameters:")
+    for key, val in vars(opt).items():
+        logger.info(f"[Config]: {key} => {val}")
 
     # Load checkpoint if we resume from a previous training.
     if opt.train_from:

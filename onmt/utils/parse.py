@@ -6,6 +6,7 @@ from onmt.utils.logging import logger
 import os
 from collections import OrderedDict
 
+
 class CustomizedYAMLConfigFileParser(ConfigFileParser):
     """Parses YAML config files. Depends on the PyYAML module.
     https://pypi.python.org/pypi/PyYAML
@@ -36,8 +37,11 @@ class CustomizedYAMLConfigFileParser(ConfigFileParser):
         """Parses the keys and values from a config file."""
         yaml = self._load_yaml()
 
+        logger.info(f"Loading Config File from {stream} ...")
+
         try:
             parsed_obj = yaml.safe_load(stream)
+
         except Exception as e:
             raise ConfigFileParserException("Couldn't parse config file: %s" % e)
 

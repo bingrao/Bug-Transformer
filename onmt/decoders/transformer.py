@@ -309,8 +309,7 @@ class TransformerDecoder(DecoderBase):
         attn_aligns = []
 
         for i, layer in enumerate(self.transformer_layers):
-            layer_cache = self.state["cache"]["layer_{}".format(i)] \
-                if step is not None else None
+            layer_cache = self.state["cache"]["layer_{}".format(i)] if step is not None else None
             output, attn, attn_align = layer(
                 output,
                 src_memory_bank,
