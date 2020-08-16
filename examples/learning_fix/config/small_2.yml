@@ -19,11 +19,11 @@ train:
   work_model: train
   data: examples/learning_fix/data/small/small
   save_model: examples/learning_fix/data/small/2/small
-  train_from: examples/learning_fix/data/small/2/small-step-500000-acc-81.42-ppl-1.87-xent-0.63.pt
+  train_from: examples/learning_fix/data/small/2/small-step-800000-acc-83.55-ppl-1.74-xent-0.55.pt
   save_checkpoint_steps: 5000
   keep_checkpoint: 10
   seed: 3435
-  train_steps: 800000
+  train_steps: 1000000
   valid_steps: 5000
   early_stopping: 5
   warmup_steps: 4000
