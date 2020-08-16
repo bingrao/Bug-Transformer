@@ -8,6 +8,7 @@ import torch.nn as nn
 from onmt.modules.util_class import Elementwise
 from torch.autograd import Variable
 
+
 class PositionalEncoding(nn.Module):
     """Sinusoidal positional encoding for non-recurrent neural networks.
 
@@ -26,7 +27,7 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros(max_len, dim)
         position = torch.arange(0, max_len).unsqueeze(1)
         div_term = torch.exp((torch.arange(0, dim, 2, dtype=torch.float) *
-                             -(math.log(10000.0) / dim)))
+                              -(math.log(10000.0) / dim)))
         pe[:, 0::2] = torch.sin(position.float() * div_term)
         pe[:, 1::2] = torch.cos(position.float() * div_term)
         pe = pe.unsqueeze(1)
@@ -229,7 +230,7 @@ class Embeddings(nn.Module):
         if n_feats != len(feat_padding_idx):
             raise ValueError("Got unequal number of feat_vocab_sizes and "
                              "feat_padding_idx ({:d} != {:d})".format(
-                                n_feats, len(feat_padding_idx)))
+                n_feats, len(feat_padding_idx)))
 
     @property
     def word_lut(self):
@@ -279,7 +280,7 @@ class Embeddings(nn.Module):
                     else:
                         source = module(source)
             else:
-                #TODO
+                # TODO
                 source = self.make_embedding(source)
                 source = source + Variable(position, requires_grad=False)  # Step
 

@@ -293,7 +293,7 @@ class TransformerDecoder(DecoderBase):
 
         tgt_words = tgt[:, :, 0].transpose(0, 1)
 
-        emb = self.embeddings(tgt, step=step, position=position)
+        emb = self.embeddings(tgt, step=step)
         assert emb.dim() == 3  # len x batch x embedding_dim
 
         output = emb.transpose(0, 1).contiguous()
