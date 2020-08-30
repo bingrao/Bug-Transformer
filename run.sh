@@ -103,13 +103,21 @@ TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
 TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
 
 # The model predict output, each line is corresponding to the line in buggy code
-[ -z "$(parse_yaml "${ConfigFile}" "translate" "output")" ] && TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output") || TranslateOutput=${DataOutputPath}/predictions.txt
+TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
+[ -z "${TranslateOutput}" ] && TranslateOutput=${DataOutputPath}/predictions.txt
 
-[ -z "$(parse_yaml "${ConfigFile}" "train" "save_model")" ] && ModelCheckpointPrefix=${RootPath}/"$(parse_yaml "${ConfigFile}" "train" "save_model")" || ModelCheckpointPrefix=${DataOutputPath}/${dataset}
+ModelCheckpointPrefix=${RootPath}/"$(parse_yaml "${ConfigFile}" "train" "save_model")"
+[ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset}
 
 # The beam size for prediction
-TranslateBeamSize=1
-#logInfo "TranslateBeamSize=${TranslateBeamSize}"
+
+TranslateBeamSize=$(parse_yaml "${ConfigFile}" "translate" "beam_size")
+[ -z "${TranslateBeamSize}" ] &&  TranslateBeamSize=10
+
+TranslateNBest=$(parse_yaml "${ConfigFile}" "translate" "n_best")
+[ -z "${TranslateNBest}" ] && TranslateNBest=10
+
+TranslateBestRatio=1.0
 
 #####################################################################
 ########################### Helper functions  #######################
@@ -141,8 +149,8 @@ function _abstract() {
   logInfo "Check ${OutputFixedFile} if exist"
   [ -f "${OutputFixedFile}" ] || exit 1
 
-  buggy_cnt=$(wc -l < "${OutputBuggyFile}")
-  fixed_cnt=$(wc -l < "${OutputFixedFile}")
+  buggy_cnt=$(awk 'END{print NR}' < "${OutputBuggyFile}")
+  fixed_cnt=$(awk 'END{print NR}' < "${OutputFixedFile}")
 
   if [ "$buggy_cnt" != "$fixed_cnt" ]
   then
@@ -198,8 +206,9 @@ function _preprocess() {
 function _translate() {
   logInfo "------------------- Translate  ------------------------"
   beam_size=$1
+  n_best=$2
 
-  logInfo "Beam Size ${beam_size}"
+  logInfo "Beam Size ${beam_size}, nums of best ${n_best}, best ratio match ${TranslateBestRatio}"
 
   # Test if checkpoint is set up in the config file
   if [ -z "$(parse_yaml "${ConfigFile}" "translate" "model")" ]
@@ -207,7 +216,8 @@ function _translate() {
       logInfo "The Checkpoint model is not be set up in ${ConfigFile}, then search best one."
 
       # NF means the number of parameters in awk command
-      ModelCheckpoint=$(ls ${ModelCheckpointPrefix}-step-*.pt |
+      # shellcheck disable=SC2012
+      ModelCheckpoint=$(ls "${ModelCheckpointPrefix}"-step-*.pt |
           awk -F '-' 'BEGIN{maxv=-1000000} {score=$(NF-4); if (score > maxv) {maxv=score; max=$0}}  END{ print max}')
   else
       ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
@@ -215,29 +225,22 @@ function _translate() {
 
   logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
   logInfo "The output prediction will be save to ${TranslateOutput}"
-  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
+  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -n_best "${n_best}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
 
   # Backup all predictions txt
   step=$(echo "${ModelCheckpoint}" | awk -F'/' '{print $NF}' | cut -d'-' -f 3)
   DataOutputStepPath=${DataOutputPath}/${step}; [ -d "$DataOutputStepPath" ] || mkdir -p "$DataOutputStepPath"
-  cp "${TranslateOutput}" "${DataOutputStepPath}"/predictions_"${beam_width}".txt
-}
-
-function _evaluation() {
-  logInfo "------------------- Bleu ------------------------"
-
-  logInfo "buggy vs fixed"
-  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateSource}" | tee -a "${LogFile}"
-
-  logInfo "prediction vs fixed"
-  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateOutput}" | tee -a "${LogFile}"
+  PredPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}".txt
+  cp "${TranslateOutput}" "${PredPath}"
+  PredBestPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}"_best.txt
 
   logInfo "------------------- Classification ------------------------"
-
-  total=$(wc -l "${TranslateTarget}" | awk '{print $1}')
+  total=$(awk 'END{print NR}' "${TranslateTarget}" | awk '{print $1}')
   logInfo "Test Set: $total"
 
-  output=$(python3 "${BinPath}"/prediction_classifier.py "${TranslateSource}" "${TranslateTarget}" "${TranslateOutput}" 2>&1)
+#  set -x
+  output=$(python3 "${BinPath}"/prediction_accuracy.py -output="${PredBestPath}" -src_buggy="${TranslateSource}" -src_fixed="${TranslateTarget}" -pred_fixed="${TranslateOutput}" -project_log="${LogFile}" -n_best="${n_best}" -best_ratio="${TranslateBestRatio}" 2>&1)
+#  set +x
   perf=$(awk '{print $1}' <<< "$output")
   changed=$(awk '{print $2}' <<< "$output")
   bad=$(awk '{print $3}' <<< "$output")
@@ -246,6 +249,15 @@ function _evaluation() {
   logInfo "Perf: $perf ($perf_perc%)"
   logInfo "Pot : $changed"
   logInfo "Bad : $bad"
+
+
+  logInfo "------------------- Bleu ------------------------"
+  logInfo "buggy vs fixed"
+  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateSource}" | tee -a "${LogFile}"
+
+  logInfo "prediction vs fixed"
+  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${PredBestPath}" | tee -a "${LogFile}"
+
 }
 
 function _inference(){
@@ -255,12 +267,12 @@ function _inference(){
   do
     logInfo "******************** Beam width: $beam_width ********************"
     SECONDS=0
-    _translate "${beam_width}"
+    _translate "${beam_width}" "${TranslateNBest}"
     elapsed=$SECONDS
     logInfo "---------- Time report ----------"
 	  logInfo "Total seconds: $elapsed"
 
-    total=$(wc -l "${TranslateSource}" | awk '{print $1}')
+    total=$(awk 'END{print NR}' "${TranslateSource}" | awk '{print $1}')
     patches=$((total * beam_width))
     avg="$(echo "scale=6; $elapsed / $patches" | bc)"
     avg_bug="$(echo "scale=6; $elapsed / $total" | bc)"
@@ -270,7 +282,7 @@ function _inference(){
     logInfo "Avg patch/sec: $avg"
     logInfo "Avg bug/sec: $avg_bug"
 
-    _evaluation
+#    _evaluation
 
     rm -fr "${TranslateOutput}"
     printf "\n\n" | tee -a "${LogFile}"
@@ -291,8 +303,8 @@ case ${target} in
    ;;
 
    "translate")
-      _translate ${TranslateBeamSize}
-      _evaluation
+      _translate ${TranslateBeamSize} "${TranslateNBest}"
+#      _evaluation
    ;;
 
    "all")

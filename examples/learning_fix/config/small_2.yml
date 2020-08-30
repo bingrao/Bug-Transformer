@@ -19,11 +19,11 @@ train:
   work_model: train
   data: examples/learning_fix/data/small/small
   save_model: examples/learning_fix/data/small/2/small
-  train_from: examples/learning_fix/data/small/2/small-step-800000-acc-83.55-ppl-1.74-xent-0.55.pt
+  train_from: examples/learning_fix/data/small/2/small-step-1000000-acc-84.45-ppl-1.69-xent-0.52.pt
   save_checkpoint_steps: 5000
   keep_checkpoint: 10
   seed: 3435
-  train_steps: 1000000
+  train_steps: 2000000
   valid_steps: 5000
   early_stopping: 5
   warmup_steps: 4000
@@ -69,10 +69,14 @@ translate:
   work_model: translate
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
+  model: examples/learning_fix/data/small/2/small-step-1000000-acc-84.45-ppl-1.69-xent-0.52.pt
   output: examples/learning_fix/data/small/2/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
   max_length: 100
   batch_size: 1024
+  n_best: 50
+  beam_size: 50
+#  gpu: 0
 #  report_align: 'true'
