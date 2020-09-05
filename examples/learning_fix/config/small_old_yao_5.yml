@@ -18,7 +18,7 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small_old/small_old
-  save_model: examples/learning_fix/data/small_old/1/small_old
+  save_model: examples/learning_fix/data/small_old/5/small_old
   save_checkpoint_steps: 1000
   keep_checkpoint: 10
   seed: 3435
@@ -32,7 +32,7 @@ train:
   word_vec_size: 512
   rnn_size: 512
   layers: 6
-  transformer_ff: 2048
+  transformer_ff: 1024
   heads: 8
 
   accum_count: 8
@@ -55,20 +55,23 @@ train:
   param_init_glorot: 'true'
   position_encoding: 'true'
 
-  master_port: 8001
-  world_size: 1
+  master_port: 7002
+  world_size: 4
   gpu_ranks:
     - 0
+    - 1
+    - 2
+    - 3
 
 translate:
   work_model: translate
 #  model: examples/learning_fix/data/small_old/small_old_step_50000.pt
   src: examples/learning_fix/data/small_old/test-buggy.txt
   tgt: examples/learning_fix/data/small_old/test-fixed.txt
-  output: examples/learning_fix/data/small_old/1/predictions.txt
+  output: examples/learning_fix/data/small_old/5/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
   max_length: 100
-  batch_size: 1024
+  batch_size: 4096
 #  report_align: 'true'

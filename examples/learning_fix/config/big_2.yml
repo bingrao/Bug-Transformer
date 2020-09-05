@@ -1,12 +1,12 @@
 preprocess:
   work_model: preprocess
-  train_src: examples/learning_fix/data/small/train-buggy.txt
-  train_tgt: examples/learning_fix/data/small/train-fixed.txt
-  valid_src: examples/learning_fix/data/small/eval-buggy.txt
-  valid_tgt: examples/learning_fix/data/small/eval-fixed.txt
-  save_data: examples/learning_fix/data/small/small
-  src_seq_length: 46679
-  tgt_seq_length: 46679
+  train_src: examples/learning_fix/data/big/train-buggy.txt
+  train_tgt: examples/learning_fix/data/big/train-fixed.txt
+  valid_src: examples/learning_fix/data/big/eval-buggy.txt
+  valid_tgt: examples/learning_fix/data/big/eval-fixed.txt
+  save_data: examples/learning_fix/data/big/big
+  src_seq_length: 99042
+  tgt_seq_length: 99042
   src_seq_length_trunc: 400
   tgt_seq_length_trunc: 200
   num_threads: 10
@@ -17,22 +17,24 @@ preprocess:
 
 train:
   work_model: train
-  data: examples/learning_fix/data/small/small
-  save_model: examples/learning_fix/data/small/1/small
+  data: examples/learning_fix/data/big/big
+  save_model: examples/learning_fix/data/big/2/big
+  train_from: examples/learning_fix/data/big/2/big-step-200000-acc-83.59-ppl-1.74-xent-0.56.pt
   save_checkpoint_steps: 5000
   keep_checkpoint: 10
   seed: 3435
-  train_steps: 100000
-  valid_steps: 10000
+  train_steps: 400000
+  valid_steps: 5000
+  early_stopping: 5
   warmup_steps: 4000
   report_every: 1000
 
   decoder_type: transformer
   encoder_type: transformer
-  word_vec_size: 128
-  rnn_size: 128
+  word_vec_size: 64
+  rnn_size: 64
   layers: 6
-  transformer_ff: 512
+  transformer_ff: 256
   heads: 8
 
   accum_count: 8
@@ -40,7 +42,7 @@ train:
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
-  learning_rate: 0.001
+  learning_rate: 0.01
   max_grad_norm: 0.0
 
   batch_size: 1024
@@ -55,7 +57,7 @@ train:
   param_init_glorot: 'true'
   position_encoding: 'true'
 
-  master_port: 8001
+  master_port: 8003
   world_size: 4
   gpu_ranks:
     - 0
@@ -65,10 +67,10 @@ train:
 
 translate:
   work_model: translate
-#  model: examples/learning_fix/data/small/1/small_step_50000.pt
-  src: examples/learning_fix/data/small/test-buggy.txt
-  tgt: examples/learning_fix/data/small/test-fixed.txt
-  output: examples/learning_fix/data/small/1/predictions.txt
+#  model: examples/learning_fix/data/big/big_step_50000.pt
+  src: examples/learning_fix/data/big/test-buggy.txt
+  tgt: examples/learning_fix/data/big/test-fixed.txt
+  output: examples/learning_fix/data/big/2/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0

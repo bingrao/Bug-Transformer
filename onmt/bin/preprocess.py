@@ -15,10 +15,7 @@ from onmt.utils.misc import split_corpus
 import onmt.inputters as inputters
 import onmt.opts as opts
 from onmt.utils.parse import ArgumentParser
-from onmt.inputters.inputter import _build_fields_vocab,\
-                                    _load_vocab, \
-                                    old_style_vocab, \
-                                    load_old_vocab
+from onmt.inputters.inputter import _build_fields_vocab, _load_vocab, old_style_vocab, load_old_vocab
 
 from functools import partial
 from multiprocessing import Pool
@@ -57,7 +54,7 @@ def process_one_shard(corpus_params, params):
     :return:
     """
     corpus_type, fields, src_reader, tgt_reader, align_reader, opt,\
-         existing_fields, src_vocab, tgt_vocab, src_pos_reader, tgt_pos_reader = corpus_params
+    existing_fields, src_vocab, tgt_vocab, src_pos_reader, tgt_pos_reader = corpus_params
     i, (src_shard, tgt_shard, align_shard, maybe_id, filter_pred, src_pos_shard, tgt_pos_shard) = params
     # create one counter per shard
     sub_sub_counter = defaultdict(Counter)
@@ -127,7 +124,8 @@ def process_one_shard(corpus_params, params):
         tgt_lens = list(map(lambda x: len(x.tgt[0]), dataset.examples))
         histogram(data=src_lens, path=src_data_path)
         histogram(data=tgt_lens, path=tgt_data_path)
-        logger.info(f"Phase [{shard_base}] average src token {sum(src_lens)/len(src_lens)}, tgt token {sum(tgt_lens)/len(tgt_lens)}")
+        logger.info(
+            f"Phase [{shard_base}] average src token {sum(src_lens) / len(src_lens)}, tgt token {sum(tgt_lens) / len(tgt_lens)}")
     logger.info(" * saving %sth %s data shard to %s." % (i, shard_base, data_path))
 
     dataset.save(data_path)
@@ -231,7 +229,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
 
 
     def shard_iterator_with_position(srcs, tgts, ids, aligns, existing_shards,
-                       existing_fields, corpus_type, opt, srcs_pos, tgts_pos):
+                                     existing_fields, corpus_type, opt, srcs_pos, tgts_pos):
         """
         Builds a single iterator yielding every shard of every corpus.
         """
@@ -394,7 +392,8 @@ def preprocess(opt):
                            src_pos_reader=src_pos_reader, tgt_pos_reader=tgt_pos_reader)
 
     logger.info("--- %s seconds ---" % (time.time() - start_time))
-current_target = "None"
+
+
 def _get_parser():
 
     parser = ArgumentParser(model="preprocess", description='preprocess.py')

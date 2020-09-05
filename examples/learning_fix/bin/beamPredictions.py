@@ -72,7 +72,7 @@ for idx in range(num_pred):
     final_string = ""
     for i in range(beam_size):
         output_string = ' '.join(output[i])
-        if(i < (beam_size-1)):
+        if i < (beam_size - 1):
             output_file_separate.write(output_string.replace("SEQUENCE_END", "").strip() + "\n")
             final_string = final_string + output_string.replace("SEQUENCE_END", "").strip() + " <SEP> "
         else:
