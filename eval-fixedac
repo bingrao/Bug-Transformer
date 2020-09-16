@@ -1,0 +1,1 @@
+private void Method_1 ( ) { ( Varl_1 ) -- ; if ( ( Varl_1 ) <= 0 ) { Varl_1 = 0 ; Method_2 ( String_1 , false ) ; } else if ( ! ( Varl_2 . isEmpty ( ) ) ) Method_2 ( Varl_2 . get ( ( ( Varl_2 . size ( ) ) - ( Varl_1 ) ) ) , true ) ; }

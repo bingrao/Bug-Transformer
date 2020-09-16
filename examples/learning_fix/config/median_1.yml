@@ -35,7 +35,7 @@ train:
   word_vec_size: 512
   rnn_size: 512
   layers: 6
-  transformer_ff: 2058
+  transformer_ff: 2048
   heads: 8
 
   accum_count: 8
@@ -59,10 +59,12 @@ train:
   position_encoding: 'true'
 
   master_port: 8002
-  world_size: 2
+  world_size: 4
   gpu_ranks:
     - 0
     - 1
+    - 2
+    - 3
 
 translate:
   work_model: translate
