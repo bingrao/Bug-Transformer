@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 ############################# Root envs ############################
 RootPath=$(pwd)
 ProjectPath=${RootPath}/examples/learning_fix
