@@ -29,10 +29,6 @@ target=$2
 configFile=$3
 prefix="${dataset}-$target-$(echo "${configFile}" | cut -d'.' -f1)"
 
-echo "[$(date +"%F %T,%3N") INFO] Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
-$(echo "$configFile" | grep -Eq  '*_[0-9]+\.yml'$) || exit 1
-echo "[$(date +"%F %T,%3N") INFO] Config file name is good"
-
 config_index=$(echo "${configFile}" |  tr -dc '0-9')
 
 DataOutputPath=${DataPath}/${dataset}/${config_index}; [ -d "$DataOutputPath" ] || mkdir -p "$DataOutputPath"
@@ -44,6 +40,12 @@ LogFile=${LogPath}/${CurrentDate}-${prefix}.log
 function logInfo() {
     echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
 }
+if [ "$target" != "abstract" ]; then
+  logInfo "[$(date +"%F %T,%3N") INFO] Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
+  $(echo "$configFile" | grep -Eq  '*_[0-9]+\.yml'$) || exit 1
+  logInfo "[$(date +"%F %T,%3N") INFO] Config file name is good"
+fi
+
 
 # Config files for model data preprocess, train, translate
 ConfigFile=${ConfigPath}/${configFile}
@@ -60,7 +62,7 @@ function parse_and_print_yaml {
    sed -ne "s|^\($s\):|\1|" \
         -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
         -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   awk -F$fs '{
+   awk -F"$fs" '{
       indent = length($1)/2;
       vname[indent] = $2;
       for (i in vname) {if (i > indent) {delete vname[i]}}
@@ -159,7 +161,7 @@ function _abstract() {
   fi
 
   train_cnt="$(echo "scale=0; $buggy_cnt *  0.8 / 1" | bc)"
-  eval_cnt="$(echo "scale=0; $buggy_cnt *  0.12 / 1" | bc)"
+  eval_cnt="$(echo "scale=0; $buggy_cnt *  0.1 / 1" | bc)"
 
   logInfo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}" | tee -a "${LogFile}"
@@ -238,9 +240,7 @@ function _translate() {
   total=$(awk 'END{print NR}' "${TranslateTarget}" | awk '{print $1}')
   logInfo "Test Set: $total"
 
-#  set -x
   output=$(python3 "${BinPath}"/prediction_accuracy.py -output="${PredBestPath}" -src_buggy="${TranslateSource}" -src_fixed="${TranslateTarget}" -pred_fixed="${TranslateOutput}" -project_log="${LogFile}" -n_best="${n_best}" -best_ratio="${TranslateBestRatio}" 2>&1)
-#  set +x
   perf=$(awk '{print $1}' <<< "$output")
   changed=$(awk '{print $2}' <<< "$output")
   bad=$(awk '{print $3}' <<< "$output")
@@ -262,12 +262,12 @@ function _translate() {
 
 function _inference(){
   logInfo "------------------- Inference Search ------------------------"
-  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50" "100")
+  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
   for beam_width in ${beam_widths[*]}
   do
     logInfo "******************** Beam width: $beam_width ********************"
     SECONDS=0
-    _translate "${beam_width}" "${TranslateNBest}"
+    _translate "${beam_width}" "${beam_width}"
     elapsed=$SECONDS
     logInfo "---------- Time report ----------"
 	  logInfo "Total seconds: $elapsed"
@@ -281,8 +281,6 @@ function _inference(){
     logInfo "Total patches: $patches"
     logInfo "Avg patch/sec: $avg"
     logInfo "Avg bug/sec: $avg_bug"
-
-#    _evaluation
 
     rm -fr "${TranslateOutput}"
     printf "\n\n" | tee -a "${LogFile}"
@@ -304,7 +302,6 @@ case ${target} in
 
    "translate")
       _translate ${TranslateBeamSize} "${TranslateNBest}"
-#      _evaluation
    ;;
 
    "all")

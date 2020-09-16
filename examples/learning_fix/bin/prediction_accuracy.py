@@ -23,7 +23,7 @@ def get_logger(run_name="logs", save_log=None, isDebug=False):
     logger.setLevel(debug_level)
 
     if not logger.handlers:  # execute only if logger doesn't already exist
-        file_handler = logging.FileHandler(log_filepath, 'w', 'utf-8')
+        file_handler = logging.FileHandler(log_filepath, 'a', 'utf-8')
         stream_handler = logging.StreamHandler(os.sys.stdout)
 
         formatter = logging.Formatter('[%(levelname)s] %(asctime)s > %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -76,6 +76,7 @@ def accuarcy(args):
             fixed = src_fixed[i]
             preds = pred_fixed[i*n_best:(i+1)*n_best]
 
+            # Reture the best score of similarity with a tuple of (index, similarity_score).
             fixed_max_match = max([(index, get_similarity(fixed, tgt)) for index, tgt in enumerate(preds)],
                                   key=itemgetter(1))
 
@@ -95,6 +96,9 @@ def accuarcy(args):
             else:
                 count_changed += 1
 
+    # logging.info(
+    #     f"Count Perfect[{count_perfect}], changed {count_changed}, "
+    #     f"bad {count_bad}, performance {(count_perfect * 1.0 / nums_buggy): 0.4f}")
 
     return count_perfect, count_changed, count_bad
 
@@ -112,10 +116,11 @@ if __name__ == "__main__":
     parser.add_argument('-debug', '--debug', type=bool, default=False)
     args = parser.parse_args()
     logging = get_logger(save_log=args.project_log, isDebug=args.debug)
+
     args_checkup(args, logging)
 
-    count_perfect, count_changed, count_bad = accuarcy(args)
+    # logging.info(f"The number of n_best is [{args.n_best}], and the threshold of best ratio is {args.best_ratio}")
 
-    # logging.info(f"Count Perfect[{count_perfect}], changed {count_changed}, bad {count_bad}")
+    count_perfect, count_changed, count_bad = accuarcy(args)
 
     sys.exit((str(count_perfect) + " " + str(count_changed) + " " + str(count_bad)))
