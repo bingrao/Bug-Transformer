@@ -15,7 +15,10 @@ from onmt.utils.misc import split_corpus
 import onmt.inputters as inputters
 import onmt.opts as opts
 from onmt.utils.parse import ArgumentParser
-from onmt.inputters.inputter import _build_fields_vocab, _load_vocab, old_style_vocab, load_old_vocab
+from onmt.inputters.inputter import _build_fields_vocab, \
+    _load_vocab, \
+    old_style_vocab, \
+    load_old_vocab
 
 from functools import partial
 from multiprocessing import Pool
@@ -53,7 +56,7 @@ def process_one_shard(corpus_params, params):
     :param params:
     :return:
     """
-    corpus_type, fields, src_reader, tgt_reader, align_reader, opt,\
+    corpus_type, fields, src_reader, tgt_reader, align_reader, opt, \
     existing_fields, src_vocab, tgt_vocab, src_pos_reader, tgt_pos_reader = corpus_params
     i, (src_shard, tgt_shard, align_shard, maybe_id, filter_pred, src_pos_shard, tgt_pos_shard) = params
     # create one counter per shard
@@ -181,7 +184,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
         tgts_pos = opt.train_tgt_pos
         ids = [None]
         aligns = [opt.valid_align]
-        
+
     # Check if exist src_vocab, tgt_vocab and fields provided by users
     src_vocab, tgt_vocab, existing_fields = maybe_load_vocab(
         corpus_type, counters, opt)
@@ -204,7 +207,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
                     logger.warning("Overwrite shards for corpus {}".format(maybe_id))
                 else:
                     if corpus_type == "train":
-                        assert existing_fields is not None,\
+                        assert existing_fields is not None, \
                             ("A 'vocab.pt' file should be passed to "
                              "`-src_vocab` when adding a corpus to "
                              "a set of already existing shards.")
@@ -227,7 +230,6 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
             for i, (ss, ts, a_s) in enumerate(zip(src_shards, tgt_shards, align_shards)):
                 yield i, (ss, ts, a_s, maybe_id, filter_pred, None, None)
 
-
     def shard_iterator_with_position(srcs, tgts, ids, aligns, existing_shards,
                                      existing_fields, corpus_type, opt, srcs_pos, tgts_pos):
         """
@@ -240,7 +242,7 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
                                    .format(maybe_id))
                 else:
                     if corpus_type == "train":
-                        assert existing_fields is not None,\
+                        assert existing_fields is not None, \
                             ("A 'vocab.pt' file should be passed to "
                              "`-src_vocab` when adding a corpus to "
                              "a set of already existing shards.")
@@ -353,11 +355,11 @@ def preprocess(opt):
     tgt_nfeats = count_features(opt.train_tgt[0])  # tgt always text so far
     if len(opt.train_src) > 1 and (opt.data_type == 'text' or opt.data_type == 'code'):
         for src, tgt in zip(opt.train_src[1:], opt.train_tgt[1:]):
-            assert src_nfeats == count_features(src),\
-                "%s seems to mismatch features of "\
+            assert src_nfeats == count_features(src), \
+                "%s seems to mismatch features of " \
                 "the other source datasets" % src
-            assert tgt_nfeats == count_features(tgt),\
-                "%s seems to mismatch features of "\
+            assert tgt_nfeats == count_features(tgt), \
+                "%s seems to mismatch features of " \
                 "the other target datasets" % tgt
     logger.info(" * number of source features: %d." % src_nfeats)
     logger.info(" * number of target features: %d." % tgt_nfeats)
@@ -394,8 +396,10 @@ def preprocess(opt):
     logger.info("--- %s seconds ---" % (time.time() - start_time))
 
 
-def _get_parser():
+# current_target = "None"
 
+
+def _get_parser():
     parser = ArgumentParser(model="preprocess", description='preprocess.py')
     opts.config_opts(parser)
     opts.preprocess_opts(parser)
@@ -403,12 +407,9 @@ def _get_parser():
 
 
 def main():
-
-
     parser = _get_parser()
     opt = parser.parse_args()
     preprocess(opt)
-
 
 
 if __name__ == "__main__":

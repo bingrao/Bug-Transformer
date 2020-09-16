@@ -8,7 +8,6 @@ import torch.nn as nn
 from onmt.modules.util_class import Elementwise
 from torch.autograd import Variable
 
-
 class PositionalEncoding(nn.Module):
     """Sinusoidal positional encoding for non-recurrent neural networks.
 
@@ -280,7 +279,7 @@ class Embeddings(nn.Module):
                     else:
                         source = module(source)
             else:
-                # TODO
+                #TODO
                 source = self.make_embedding(source)
                 source = source + Variable(position, requires_grad=False)  # Step
 

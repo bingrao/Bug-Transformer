@@ -258,7 +258,7 @@ class Trainer(object):
             if self.n_gpu > 1:
                 normalization = sum(onmt.utils.distributed.all_gather_list(normalization))
 
-            # Here submit batch for traning ...
+            # Here submit batch for training ...
             self._gradient_accumulation(batches, normalization, total_stats, report_stats)
 
             if self.average_decay > 0 and i % self.average_every == 0:
