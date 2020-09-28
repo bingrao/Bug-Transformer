@@ -95,7 +95,7 @@ class BeamSearch(DecodeStrategy):
 
     def initialize(self, memory_bank, src_lengths, src_map=None, device=None):
         """Initialize for decoding.
-        Repeat src objects `beam_size` times.
+        Repeat src objects `beam_size` times. memory_bank: (src_len, batch_size, nfeats)
         """
 
         def fn_map_state(state, dim):
@@ -106,13 +106,13 @@ class BeamSearch(DecodeStrategy):
                                 for x in memory_bank)
             mb_device = memory_bank[0].device
         else:
-            memory_bank = tile(memory_bank, self.beam_size, dim=1)
+            memory_bank = tile(memory_bank, self.beam_size, dim=1)  # (src_len, batch_size*beam_size, nfeats)
             mb_device = memory_bank.device
         if src_map is not None:
             src_map = tile(src_map, self.beam_size, dim=1)
         if device is None:
             device = mb_device
-
+        # (batch_size * beam_size)
         self.memory_lengths = tile(src_lengths, self.beam_size)
         super(BeamSearch, self).initialize(
             memory_bank, self.memory_lengths, src_map, device)
@@ -150,7 +150,7 @@ class BeamSearch(DecodeStrategy):
     def advance(self, log_probs, attn):
         vocab_size = log_probs.size(-1)
 
-        # using integer division to get an integer _B without casting
+        # Batch_size: using integer division to get an integer _B without casting
         _B = log_probs.shape[0] // self.beam_size
 
         if self._stepwise_cov_pen and self._prev_penalty is not None:
@@ -163,27 +163,29 @@ class BeamSearch(DecodeStrategy):
         step = len(self)
         self.ensure_min_length(log_probs)
 
-        # Multiply probs by the beam probability.
+        # Multiply probs by the beam probability: add previous topk_log_probs to current log_probs
         log_probs += self.topk_log_probs.view(_B * self.beam_size, 1)
 
         # if the sequence ends now, then the penalty is the current
         # length + 1, to include the EOS token
         length_penalty = self.global_scorer.length_penalty(
             step + 1, alpha=self.global_scorer.alpha)
-
+        # (batch_size*beam_size, vocab_size)
         curr_scores = log_probs / length_penalty
 
         # Avoid any direction that would repeat unwanted ngrams
         self.block_ngram_repeats(curr_scores)
 
-        # Flatten probs into a list of possibilities.
+        # Flatten probs into a list of possibilities: (batch_size, beam_size * vocab_size)
         curr_scores = curr_scores.reshape(_B, self.beam_size * vocab_size)
         torch.topk(curr_scores,  self.beam_size, dim=-1,
                    out=(self.topk_scores, self.topk_ids))
+        # For each element in a batch, there are [[beam_size]] different groups probability,
+        # choose the top 1 from each group to build topK
 
         # Recover log probs.
         # Length penalty is just a scalar. It doesn't matter if it's applied
-        # before or after the topk.
+        # before or after the topk. Update topk_log_probs using latest (topk_scores * length_penalty)
         torch.mul(self.topk_scores, length_penalty, out=self.topk_log_probs)
 
         # Resolve beam origin and map to batch index flat representation.

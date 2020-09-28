@@ -121,7 +121,7 @@ class GreedySearch(DecodeStrategy):
 
     def advance(self, log_probs, attn):
         """Select next tokens randomly from the top k possible next tokens.
-
+           then append top_K to self.alive_seq
         Args:
             log_probs (FloatTensor): Shaped ``(batch_size, vocab_size)``.
                 These can be logits (``(-inf, inf)``) or log-probs
@@ -138,7 +138,7 @@ class GreedySearch(DecodeStrategy):
             log_probs, self.sampling_temp, self.keep_topk)
 
         self.is_finished = topk_ids.eq(self.eos)
-
+        # update current topk_id to alive_seq
         self.alive_seq = torch.cat([self.alive_seq, topk_ids], -1)
         if self.return_attention:
             if self.alive_attn is None:

@@ -297,6 +297,8 @@ class Translator(object):
         """Translate content of ``src`` and get gold scores from ``tgt``.
 
         Args:
+            batch_type:
+            phrase_table:
             src: See :func:`self.src_reader.read()`.
             tgt: See :func:`self.tgt_reader.read()`.
             src_dir: See :func:`self.src_reader.read()` (only relevant
@@ -324,6 +326,8 @@ class Translator(object):
         # corpus_id field is useless here
         if self.fields.get("corpus_id", None) is not None:
             self.fields.pop('corpus_id')
+
+        # load data via reader, a list of input for src and tgt
         data = inputters.Dataset(
             self.fields, readers=_readers, data=_data, dirs=_dir,
             sort_key=inputters.str2sortkey[self.data_type],
@@ -357,9 +361,9 @@ class Translator(object):
         start_time = time.time()
 
         for batch in data_iter:
-            batch_data = self.translate_batch(
-                batch, data.src_vocabs, attn_debug
-            )
+            # create decode strategy and decode input
+            batch_data = self.translate_batch(batch, data.src_vocabs, attn_debug)
+
             translations = xlation_builder.from_batch(batch_data)
 
             for trans in translations:
@@ -553,8 +557,7 @@ class Translator(object):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) \
                            else (batch.src, None)
 
-        enc_states, memory_bank, src_lengths = self.model.encoder(
-            src, src_lengths)
+        enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths)
         if src_lengths is None:
             assert not isinstance(memory_bank, tuple), \
                 'Ensemble decoding only supported for text data'
@@ -580,10 +583,12 @@ class Translator(object):
                 decoder_in.gt(self._tgt_vocab_len - 1), self._tgt_unk_idx
             )
 
-        # Decoder forward, takes [tgt_len, batch, nfeats] as input
-        # and [src_len, batch, hidden] as memory_bank
+        # Decoder forward, takes [tgt_len, batch*beam_size, nfeats] as input
+        # and [src_len, batch*beam_size, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
+        # dec_out: (tgt_len, batch*beam_size, nfeats=512)
+        # dec_attn: (tgt_len, batch*beam_size, src_len=70)
         dec_out, dec_attn = self.model.decoder(
             decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
         )
@@ -665,8 +670,13 @@ class Translator(object):
 
         # (3) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
+            # get last decoder output as current input from decode_strategy
+            # decoder_input: (tgt_len = 1, batch_size*beam_size, nfeats = 1)
             decoder_input = decode_strategy.current_predictions.view(1, -1, 1)
 
+            # cacluate probability for each output token
+            # log_probs: (tgt_len = 1, batch_size*beam_size, vocab_size=415)
+            # attn: (tgt_len, batch_size*beam_size, src_len=70)
             log_probs, attn = self._decode_and_generate(
                 decoder_input,
                 memory_bank,
@@ -717,15 +727,16 @@ class Translator(object):
                       src_vocabs, src_map):
         tgt = batch.tgt
         tgt_in = tgt[:-1]
-
+        # log_probs: (seq_len, batch_size, vocabulary_size) --> For an output sequence, its size is [[seq_len]],
+        # for each token in a sequence, there are [[vocabulary_size]] probabilities with different values.
         log_probs, attn = self._decode_and_generate(
             tgt_in, memory_bank, batch, src_vocabs,
             memory_lengths=src_lengths, src_map=src_map)
-
+        # set up pad tokens  probability 0
         log_probs[:, :, self._tgt_pad_idx] = 0
-        gold = tgt[1:]
-        gold_scores = log_probs.gather(2, gold)
-        gold_scores = gold_scores.sum(dim=0).view(-1)
+        gold = tgt[1:]  # ground truth target removing last one token (seq_len, batch_size, 1)
+        gold_scores = log_probs.gather(2, gold)  # get gold scores from log_probs: (seq_len, batch_size, 1)
+        gold_scores = gold_scores.sum(dim=0).view(-1)  # sum of all probablity of an input sequence, (batch_size)
 
         return gold_scores
 

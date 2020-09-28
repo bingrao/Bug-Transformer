@@ -720,7 +720,7 @@ def translate_opts(parser):
               help="Random seed")
 
     group = parser.add_argument_group('Beam')
-    group.add('--beam_size', '-beam_size', type=int, default=5,
+    group.add('--beam_size', '-beam_size', type=int, default=1,
               help='Beam size')
     group.add('--min_length', '-min_length', type=int, default=0,
               help='Minimum prediction length')

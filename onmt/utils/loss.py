@@ -6,10 +6,78 @@ from __future__ import division
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 import onmt
 from onmt.modules.sparse_losses import SparsemaxLoss
 from onmt.modules.sparse_activations import LogSparsemax
+from onmt.utils.logging import logger
+from torch.autograd import Variable
+
+
+class FocalLoss(nn.Module):
+    r"""
+        This criterion is a implemenation of Focal Loss, which is proposed in
+        Focal Loss for Dense Object Detection.
+
+            Loss(x, class) = - \alpha (1-softmax(x)[class])^gamma \log(softmax(x)[class])
+
+        The losses are averaged across observations for each minibatch.
+
+        Args:
+            alpha(1D Tensor, Variable) : the scalar factor for this criterion
+            gamma(float, double) : gamma > 0; reduces the relative loss for well-classiﬁed examples (p > .5),
+                                   putting more focus on hard, misclassiﬁed examples
+            size_average(bool): By default, the losses are averaged over observations for each minibatch.
+                                However, if the field size_average is set to False, the losses are
+                                instead summed for each minibatch.
+
+
+    """
+
+    def __init__(self, class_num, ignore_index, alpha=None, gamma=2, reduction='elementwise_mean'):
+        assert reduction in ['elementwise_mean', 'sum', 'none']
+        super(FocalLoss, self).__init__()
+        if alpha is None:
+            self.alpha = Variable(torch.ones(class_num, 1))
+        else:
+            if isinstance(alpha, Variable):
+                self.alpha = alpha
+            else:
+                self.alpha = Variable(alpha)
+        self.ignore_index = ignore_index
+        self.gamma = gamma
+        self.class_num = class_num
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        N = inputs.size(0)
+        C = inputs.size(1)
+        P = F.softmax(inputs, dim=1)
+
+        class_mask = inputs.data.new(N, C).fill_(0)
+        class_mask = Variable(class_mask)
+        ids = targets.view(-1, 1)
+        class_mask.scatter_(1, ids.data, 1.)
+        # print(class_mask)
+
+        if inputs.is_cuda and not self.alpha.is_cuda:
+            self.alpha = self.alpha.cuda()
+        alpha = self.alpha[ids.data.view(-1)]
+
+        probs = (P * class_mask).sum(1).view(-1, 1)
+
+        log_p = probs.log()
+        # print('probs size= {}'.format(probs.size()))
+        # print(probs)
+
+        batch_loss = -alpha * (torch.pow((1 - probs), self.gamma)) * log_p
+        # print('-----bacth_loss------')
+        # print(batch_loss)
+
+        if self.reduction == 'sum':
+            loss = batch_loss.sum()
+        elif self.reduction == 'elementwise_mean':
+            loss = batch_loss.mean()
+        return loss
 
 
 def build_loss_compute(model, tgt_field, opt, train=True):
@@ -28,7 +96,7 @@ def build_loss_compute(model, tgt_field, opt, train=True):
 
     if opt.lambda_coverage != 0:
         assert opt.coverage_attn, "--coverage_attn needs to be set in " \
-            "order to use --lambda_coverage != 0"
+                                  "order to use --lambda_coverage != 0"
 
     if opt.copy_attn:
         criterion = onmt.modules.CopyGeneratorLoss(
@@ -42,7 +110,8 @@ def build_loss_compute(model, tgt_field, opt, train=True):
     elif isinstance(model.generator[-1], LogSparsemax):
         criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
     else:
-        criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
+        # criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
+        criterion = FocalLoss(class_num=len(tgt_field.vocab.itos), ignore_index=padding_idx, reduction='sum')
 
     # if the loss function operates on vectors of raw logits instead of
     # probabilities, only the first part of the generator needs to be
@@ -159,12 +228,20 @@ class LossComputeBase(nn.Module):
         trunc_range = (trunc_start, trunc_start + trunc_size)
         shard_state = self._make_shard_state(batch, output, trunc_range, attns)
         if shard_size == 0:
-            loss, stats = self._compute_loss(batch, **shard_state)
-            return loss / float(normalization), stats
+            _loss, stats, match_loss = self._compute_loss(batch, **shard_state)
+            loss = _loss / float(normalization)
+            # loss = loss - match_loss * 0.001
+            return loss, stats
         batch_stats = onmt.utils.Statistics()
         for shard in shards(shard_state, shard_size):
-            loss, stats = self._compute_loss(batch, **shard)
-            loss.div(float(normalization)).backward()
+            _loss, stats, match_loss = self._compute_loss(batch, **shard)
+            loss = _loss.div(float(normalization))
+
+            # if match_loss.float() >= 0.1:
+            #     logger.info(f"[********] The match loss is : {match_loss} -- {loss}")
+
+            # loss = loss - match_loss * 0.001
+            loss.backward()
             batch_stats.update(stats)
         return None, batch_stats
 
@@ -197,6 +274,7 @@ class LabelSmoothingLoss(nn.Module):
     KL-divergence between q_{smoothed ground truth prob.}(w)
     and p_{prob. computed by model}(w) is minimized.
     """
+
     def __init__(self, label_smoothing, tgt_vocab_size, ignore_index=-100):
         assert 0.0 < label_smoothing <= 1.0
         self.ignore_index = ignore_index
@@ -242,9 +320,9 @@ class NMTLossCompute(LossComputeBase):
             std = attns.get("std", None)
             assert attns is not None
             assert std is not None, "lambda_coverage != 0.0 requires " \
-                "attention mechanism"
+                                    "attention mechanism"
             assert coverage is not None, "lambda_coverage != 0.0 requires " \
-                "coverage attention"
+                                         "coverage attention"
 
             shard_state.update({
                 "std_attn": attns.get("std"),
@@ -259,9 +337,9 @@ class NMTLossCompute(LossComputeBase):
             align_idx = batch.align
             assert attns is not None
             assert attn_align is not None, "lambda_align != 0.0 requires " \
-                "alignement attention head"
+                                           "alignement attention head"
             assert align_idx is not None, "lambda_align != 0.0 requires " \
-                "provide guided alignement"
+                                          "provide guided alignement"
             pad_tgt_size, batch_size, _ = batch.tgt.size()
             pad_src_size = batch.src[0].size(0)
             align_matrix_size = [batch_size, pad_tgt_size, pad_src_size]
@@ -283,6 +361,8 @@ class NMTLossCompute(LossComputeBase):
         scores = self.generator(bottled_output)
         gtruth = target.view(-1)
 
+        match_loss = get_max_match_greedy_decode(scores, gtruth).div(float(gtruth.shape[0]))
+
         loss = self.criterion(scores, gtruth)
         if self.lambda_coverage != 0.0:
             coverage_loss = self._compute_coverage_loss(
@@ -298,7 +378,7 @@ class NMTLossCompute(LossComputeBase):
             loss += align_loss
         stats = self._stats(loss.clone(), scores, gtruth)
 
-        return loss, stats
+        return loss, stats, match_loss
 
     def _compute_coverage_loss(self, std_attn, coverage_attn):
         covloss = torch.min(std_attn, coverage_attn).sum()
@@ -379,3 +459,8 @@ def shards(state, shard_size, eval_only=False):
                                      [v_chunk.grad for v_chunk in v_split]))
         inputs, grads = zip(*variables)
         torch.autograd.backward(inputs, grads)
+
+
+def get_max_match_greedy_decode(probability, target):
+    _, next_word = torch.max(probability, dim=1)
+    return torch.sum(torch.eq(next_word, target) == True)

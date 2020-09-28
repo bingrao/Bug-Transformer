@@ -15,11 +15,12 @@ def translate(opt):
     ArgumentParser.validate_translate_opts(opt)
     logger = init_logger(opt.log_file)
 
-    # logger.info("The Input Parameters:")
-    # for key, val in vars(opt).items():
-    #     logger.info(f"[Config]: {key} => {val}")
+    logger.info("The Input Parameters:")
+    for key, val in vars(opt).items():
+        logger.info(f"[Config]: {key} => {val}")
 
     translator = build_translator(opt, report_score=True)
+    # A list of line in opt.src
     src_shards = split_corpus(opt.src, opt.shard_size)
     tgt_shards = split_corpus(opt.tgt, opt.shard_size)
     shard_pairs = zip(src_shards, tgt_shards)
