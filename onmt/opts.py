@@ -326,10 +326,8 @@ def preprocess_opts(parser):
               type=int, default=1,
               help="Make the vocabulary size a multiple of this value")
 
-    group.add('--src_words_min_frequency',
-              '-src_words_min_frequency', type=int, default=0)
-    group.add('--tgt_words_min_frequency',
-              '-tgt_words_min_frequency', type=int, default=0)
+    group.add('--src_words_min_frequency', '-src_words_min_frequency', type=int, default=0)
+    group.add('--tgt_words_min_frequency', '-tgt_words_min_frequency', type=int, default=0)
 
     group.add('--dynamic_dict', '-dynamic_dict', action='store_true',
               help="Create dynamic dictionaries")
@@ -574,6 +572,21 @@ def train_opts(parser):
                    "Set to zero to turn off label smoothing. "
                    "For more detailed information, see: "
                    "https://arxiv.org/abs/1512.00567")
+    group.add('--focal_loss', '-focal_loss', type=float, default=0.0,
+              help="alpha values of Focal loss for imbalance class"
+                   "For more detailed information, see: "
+                   "https://arxiv.org/pdf/1708.02002.pdf")
+
+    group.add('--focal_loss_learnable', '-focal_loss_learnable', type=bool, default=True,
+              help="Alpha values of Focal loss for imbalance class is learnable or not"
+                   "For more detailed information, see: "
+                   "https://arxiv.org/pdf/1708.02002.pdf")
+
+    group.add('--focal_loss_gamma', '-focal_loss_gamma', type=int, default=2,
+              help="gamma values of Focal loss for imbalance class"
+                   "For more detailed information, see: "
+                   "https://arxiv.org/pdf/1708.02002.pdf")
+
     group.add('--average_decay', '-average_decay', type=float, default=0,
               help="Moving average decay. "
                    "Set to other than 0 (e.g. 1e-4) to activate. "

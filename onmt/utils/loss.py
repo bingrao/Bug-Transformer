@@ -33,16 +33,13 @@ class FocalLoss(nn.Module):
 
     """
 
-    def __init__(self, class_num, ignore_index, alpha=None, gamma=2, reduction='elementwise_mean'):
+    def __init__(self, class_num, ignore_index, alpha=None, gamma=2, isLearnable=True, reduction='elementwise_mean'):
         assert reduction in ['elementwise_mean', 'sum', 'none']
         super(FocalLoss, self).__init__()
-        if alpha is None:
-            self.alpha = Variable(torch.ones(class_num, 1))
+        if isLearnable:
+            self.alpha = Variable(torch.ones(class_num, 1), requires_grad=True)
         else:
-            if isinstance(alpha, Variable):
-                self.alpha = alpha
-            else:
-                self.alpha = Variable(alpha)
+            self.alpha = Variable(torch.ones(class_num, 1).fill_(alpha), requires_grad=False)
         self.ignore_index = ignore_index
         self.gamma = gamma
         self.class_num = class_num
@@ -57,7 +54,6 @@ class FocalLoss(nn.Module):
         class_mask = Variable(class_mask)
         ids = targets.view(-1, 1)
         class_mask.scatter_(1, ids.data, 1.)
-        # print(class_mask)
 
         if inputs.is_cuda and not self.alpha.is_cuda:
             self.alpha = self.alpha.cuda()
@@ -66,12 +62,8 @@ class FocalLoss(nn.Module):
         probs = (P * class_mask).sum(1).view(-1, 1)
 
         log_p = probs.log()
-        # print('probs size= {}'.format(probs.size()))
-        # print(probs)
 
         batch_loss = -alpha * (torch.pow((1 - probs), self.gamma)) * log_p
-        # print('-----bacth_loss------')
-        # print(batch_loss)
 
         if self.reduction == 'sum':
             loss = batch_loss.sum()
@@ -107,11 +99,18 @@ def build_loss_compute(model, tgt_field, opt, train=True):
         criterion = LabelSmoothingLoss(
             opt.label_smoothing, len(tgt_field.vocab), ignore_index=padding_idx
         )
+    elif opt.focal_loss > 0 and train:
+        criterion = FocalLoss(class_num=len(tgt_field.vocab.itos),
+                              ignore_index=padding_idx,
+                              alpha=opt.focal_loss,
+                              gamma=opt.focal_loss_gamma,
+                              isLearnable=opt.focal_loss_learnable,
+                              reduction='sum')
     elif isinstance(model.generator[-1], LogSparsemax):
         criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
     else:
-        # criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
-        criterion = FocalLoss(class_num=len(tgt_field.vocab.itos), ignore_index=padding_idx, reduction='sum')
+        criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
+
 
     # if the loss function operates on vectors of raw logits instead of
     # probabilities, only the first part of the generator needs to be
