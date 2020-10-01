@@ -51,6 +51,7 @@ train:
   normalization: tokens
   dropout: 0.3
   label_smoothing: 0.0
+  focal_loss: 0.25
 
   max_generator_batches: 2
 
@@ -59,16 +60,15 @@ train:
   position_encoding: 'true'
 
   master_port: 8008
-  world_size: 4
+  world_size: 3
   gpu_ranks:
     - 0
     - 1
     - 2
-    - 3
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/small/9/small-step-22000-acc-97.41-ppl-1.08-xent-0.08.pt
+  model: examples/learning_fix/data/small/9/small-step-25000-acc-96.94-ppl-1.03-xent-0.03.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
   output: examples/learning_fix/data/small/9/predictions.txt

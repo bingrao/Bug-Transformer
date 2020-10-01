@@ -19,7 +19,6 @@ train:
   work_model: train
   data: examples/learning_fix/data/median/median
   save_model: examples/learning_fix/data/median/1/median
-#  train_from: examples/learning_fix/data/median/1/small-step-1000000-acc-68.79-ppl-2.87-xent-1.05.pt
   save_checkpoint_steps: 1000
   keep_checkpoint: 10
   seed: 3435

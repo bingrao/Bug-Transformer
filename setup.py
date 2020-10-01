@@ -22,8 +22,8 @@ setup(
     install_requires=[
         "six",
         "tqdm~=4.30.0",
-        "torch>=1.4.0",
-        "torchtext==0.4.0",
+        "torch>=1.5.0",
+        "torchtext==0.6.0",
         "future",
         "configargparse",
         "tensorboard>=1.14",
@@ -31,6 +31,7 @@ setup(
         "waitress",
         "pyonmttok==1.*;platform_system=='Linux'",
         "pyyaml",
+        "matlibplot",
     ],
     entry_points={
         "console_scripts": [
