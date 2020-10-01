@@ -342,7 +342,7 @@ class GNMTGlobalScorer(object):
             opt.length_penalty,
             opt.coverage_penalty)
 
-    def __init__(self, alpha, beta, length_penalty, coverage_penalty):
+    def __init__(self, alpha=0.0, beta=-0.0, length_penalty=None, coverage_penalty=None):
         self._validate(alpha, beta, length_penalty, coverage_penalty)
         self.alpha = alpha
         self.beta = beta

@@ -5,12 +5,9 @@ import codecs
 import os
 import time
 from functools import partial
-
 import numpy as np
 from itertools import count, zip_longest
-
 import torch
-
 import onmt.model_builder
 import onmt.inputters as inputters
 import onmt.decoders.ensemble
@@ -19,7 +16,7 @@ from onmt.translate.greedy_search import GreedySearch
 from onmt.utils.misc import tile, set_random_seed, report_matrix
 from onmt.utils.alignment import extract_alignment, build_align_pharaoh
 from onmt.modules.copy_generator import collapse_copy_scores
-
+from onmt.utils.scores import make_ext_evaluators
 
 def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
@@ -750,3 +747,55 @@ class Translator(object):
                 name, avg_score,
                 name, ppl))
         return msg
+
+
+class SimpleGreedySearch(Translator):
+    def __init__(self, model, valid_iter, external_evaluators):
+        self.model = model
+        self.fields = valid_iter.fields
+        self.data = valid_iter.dataset
+        src_field = dict(self.fields)["src"].base_field
+        self._src_vocabs = src_field.vocab
+        scorer = onmt.translate.GNMTGlobalScorer(0.0, -0.0, None, None)
+        super(SimpleGreedySearch, self).__init__(
+            model=self.model,
+            fields=self.fields,
+            src_reader=None,
+            tgt_reader=None,
+            beam_size=1,
+            n_best=1,
+            gpu=1,
+            global_scorer=scorer)
+
+        self.xlation_builder = onmt.translate.TranslationBuilder(
+            self.data, self.fields, self.n_best, self.replace_unk, True,
+            self.phrase_table
+        )
+
+        self.ext_evaluators = make_ext_evaluators(external_evaluators)
+
+
+    def batch_bleu_score(self, batch):
+        all_scores = []
+        all_predictions = []
+        all_target = []
+        results = dict()
+        batch_data = self.translate_batch(batch, self._src_vocabs, False)
+        translations = self.xlation_builder.from_batch(batch_data)
+        for trans in translations:
+            all_scores += [trans.pred_scores[:self.n_best]]
+            n_best_preds = [" ".join(pred)
+                            for pred in trans.pred_sents[:self.n_best]]
+
+            all_predictions += n_best_preds
+
+            all_target += [" ".join(trans.gold_sent)]
+
+        for evaluator in self.ext_evaluators:
+            score = evaluator(all_target, all_predictions)
+            if isinstance(score, dict):
+                results.update(score)
+            else:
+                results[evaluator.name] = score
+
+        return results

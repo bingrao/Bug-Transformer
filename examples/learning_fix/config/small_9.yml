@@ -24,7 +24,7 @@ train:
   keep_checkpoint: 10
   seed: 3435
   train_steps: 50000
-  valid_steps: 1000
+  valid_steps: 5000
   early_stopping: 10
   warmup_steps: 4000
   report_every: 1000
@@ -50,8 +50,8 @@ train:
   batch_type: tokens
   normalization: tokens
   dropout: 0.3
-  label_smoothing: 0.0
-  focal_loss: 0.25
+  label_smoothing: 0.2
+#  focal_loss: 0.25
 
   max_generator_batches: 2
 
@@ -60,11 +60,12 @@ train:
   position_encoding: 'true'
 
   master_port: 8008
-  world_size: 3
+  world_size: 4
   gpu_ranks:
     - 0
     - 1
     - 2
+    - 3
 
 translate:
   work_model: translate

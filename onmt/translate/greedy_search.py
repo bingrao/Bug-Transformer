@@ -167,3 +167,5 @@ class GreedySearch(DecodeStrategy):
             self.alive_attn = self.alive_attn[:, is_alive]
         self.select_indices = is_alive.nonzero().view(-1)
         self.original_batch_idx = self.original_batch_idx[is_alive]
+
+

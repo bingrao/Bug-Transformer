@@ -31,7 +31,6 @@ setup(
         "waitress",
         "pyonmttok==1.*;platform_system=='Linux'",
         "pyyaml",
-        "matlibplot",
     ],
     entry_points={
         "console_scripts": [

@@ -9,7 +9,7 @@ import math
 from matplotlib import pyplot as plt
 import numpy as np
 from matplotlib.pyplot import figure
-
+from statistics import mean
 
 def top_most(field, path, nums=20):
     name, base_field = field.fields[0]
@@ -173,3 +173,26 @@ class Statistics(object):
         writer.add_scalar(prefix + "/accuracy", self.accuracy(), step)
         writer.add_scalar(prefix + "/tgtper", self.n_words / t, step)
         writer.add_scalar(prefix + "/lr", learning_rate, step)
+
+
+class ScoreMetrics(object):
+    def __init__(self, ext_scores):
+        self.ext_scores = ext_scores if isinstance(ext_scores, list) else [ext_scores]
+        self.metrics = self.build_metrics()
+
+    def build_metrics(self):
+        metrics = dict()
+        for metric in self.ext_scores:
+            metrics[metric] = []
+        return metrics
+
+    def update(self, results):
+        assert isinstance(results, dict)
+        for key, value in results.items():
+            self.metrics[key] += [value]
+
+    def get_statistics(self):
+        reg = dict()
+        for key, value in self.metrics.items():
+            reg[key] = mean(value) if len(value) > 0 else 0.0
+        return reg

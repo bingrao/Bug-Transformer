@@ -14,7 +14,9 @@ import traceback
 
 import onmt.utils
 from onmt.utils.logging import logger
-
+from onmt.translate.translator import SimpleGreedySearch
+from statistics import mean
+from onmt.utils.statistics import ScoreMetrics
 
 def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
     """
@@ -155,6 +157,7 @@ class Trainer(object):
         self.source_noise = source_noise
         self.position_encoding = opt.position_encoding
         self.position_style = opt.position_style
+        self.external_evaluators = opt.external_evaluators
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -162,6 +165,8 @@ class Trainer(object):
                 assert self.trunc_size == 0, \
                     """To enable accumulated gradients,
                        you must disable target sequence truncating."""
+
+        self.translator = None
 
         # Set model in training mode.
         self.model.train()
@@ -247,7 +252,7 @@ class Trainer(object):
             step = self.optim.training_step
             # UPDATE DROPOUT
             self._maybe_update_dropout(step)
-            logger.info(f"[{step}/{train_steps}] ...")
+            # logger.info(f"[{step}/{train_steps}] ...")
             if self.gpu_verbose_level > 1:
                 logger.info("GpuRank %d: index: %d", self.gpu_rank, i)
             if self.gpu_verbose_level > 0:
@@ -268,7 +273,7 @@ class Trainer(object):
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: validate step %d' % (self.gpu_rank, step))
 
-                valid_stats = self.validate(valid_iter, moving_average=self.moving_average)
+                valid_stats, scores_status = self.validate(valid_iter, moving_average=self.moving_average)
 
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: gather valid stat step %d' % (self.gpu_rank, step))
@@ -278,7 +283,11 @@ class Trainer(object):
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: report stat step %d' % (self.gpu_rank, step))
 
+                logger.info(f"Step {step}/{train_steps} Evaluate the model using valid dataset ...")
+
                 self._report_step(self.optim.learning_rate(), step, valid_stats=valid_stats)
+
+                logger.info(f"Validation scores: {scores_status.get_statistics()}")
 
                 # Run patience mechanism
                 if self.earlystopper is not None:
@@ -309,6 +318,7 @@ class Trainer(object):
             :obj:`nmt.Statistics`: validation loss statistics
         """
         valid_model = self.model
+        metric_scores = ScoreMetrics(self.external_evaluators)
         if moving_average:
             # swap model params w/ moving average
             # (and keep the original parameters)
@@ -326,9 +336,14 @@ class Trainer(object):
             stats = onmt.utils.Statistics()
 
             for batch in valid_iter:
+
                 src, src_lengths = batch.src if isinstance(batch.src, tuple) \
                     else (batch.src, None)
                 tgt = batch.tgt
+                if self.external_evaluators != 'none':
+                    translator = SimpleGreedySearch(self.model, valid_iter, self.external_evaluators)
+                    metric_scores.update(translator.batch_bleu_score(batch))
+                    # all_bleu_scores += [translator.batch_bleu_score(batch)['bleu']]
 
                 # F-prop through the model.
                 outputs, attns = valid_model(src, tgt, src_lengths, with_align=self.with_align)
@@ -346,7 +361,10 @@ class Trainer(object):
         # Set model back to training mode.
         valid_model.train()
 
-        return stats
+        # bleus = mean(all_bleu_scores) if self.external_evaluators != 'none' else 0.0
+
+
+        return stats, metric_scores
 
     def _gradient_accumulation(self, true_batches, normalization, total_stats, report_stats):
         if self.accum_count > 1:
