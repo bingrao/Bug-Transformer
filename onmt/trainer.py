@@ -247,7 +247,7 @@ class Trainer(object):
             step = self.optim.training_step
             # UPDATE DROPOUT
             self._maybe_update_dropout(step)
-
+            logger.info(f"[{step}/{train_steps}] ...")
             if self.gpu_verbose_level > 1:
                 logger.info("GpuRank %d: index: %d", self.gpu_rank, i)
             if self.gpu_verbose_level > 0:
@@ -295,7 +295,7 @@ class Trainer(object):
                 self.optim.learning_rate(),
                 report_stats)
 
-            if train_steps > 0 and step >= train_steps:
+            if 0 < train_steps <= step:
                 break
 
         if self.model_saver is not None:
