@@ -96,10 +96,6 @@ def accuarcy(args):
             else:
                 count_changed += 1
 
-    # logging.info(
-    #     f"Count Perfect[{count_perfect}], changed {count_changed}, "
-    #     f"bad {count_bad}, performance {(count_perfect * 1.0 / nums_buggy): 0.4f}")
-
     return count_perfect, count_changed, count_bad
 
 

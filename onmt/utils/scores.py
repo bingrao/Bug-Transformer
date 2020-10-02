@@ -3,6 +3,8 @@ import abc
 from rouge import FilesRouge
 from sacrebleu import corpus_bleu
 from onmt.utils import ClassRegistry
+from difflib import SequenceMatcher
+
 
 class Scorer(abc.ABC):
     """Scores hypotheses against references."""
@@ -45,6 +47,7 @@ class Scorer(abc.ABC):
 _SCORERS_REGISTRY = ClassRegistry(base_class=Scorer)
 register_scorer = _SCORERS_REGISTRY.register  # pylint: disable=invalid-name
 
+
 @register_scorer(name="rouge")
 class ROUGEScorer(Scorer):
     """ROUGE scorer based on https://github.com/pltrdy/rouge."""
@@ -72,6 +75,28 @@ class BLEUScorer(Scorer):
     def __call__(self, ref, hyp):
         bleu = corpus_bleu(ref, [hyp], force=True)
         return bleu.score
+
+
+@register_scorer(name="ast")
+class ASTScorer(Scorer):
+    """Scorer using AST Diff."""
+
+    def __init__(self):
+        super(ASTScorer, self).__init__("ast")
+
+    def __call__(self, ref, hyp):
+        pass
+
+
+@register_scorer(name="similarity")
+class SimilarityScorer(Scorer):
+    """Scorer using """
+
+    def __init__(self):
+        super(ASTScorer, self).__init__("similarity")
+
+    def __call__(self, ref, hyp):
+        return SequenceMatcher(None, ref, hyp).ratio()
 
 
 def make_ext_evaluators(names):
