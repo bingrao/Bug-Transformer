@@ -93,7 +93,7 @@ class SimilarityScorer(Scorer):
     """Scorer using """
 
     def __init__(self):
-        super(ASTScorer, self).__init__("similarity")
+        super(SimilarityScorer, self).__init__("similarity")
 
     def __call__(self, ref, hyp):
         return SequenceMatcher(None, ref, hyp).ratio()

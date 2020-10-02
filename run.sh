@@ -26,6 +26,9 @@ fi
 dataset=$1
 target=$2
 configFile=$3
+
+enableTranslate=false
+
 prefix="${dataset}-$target-$(echo "${configFile}" | cut -d'.' -f1)"
 
 config_index=$(echo "${configFile}" |  tr -dc '0-9')
@@ -135,7 +138,7 @@ function _abstract() {
       exit 1
   fi
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
-  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "${ConfigAbstract}"
+  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "abstract" "${ConfigAbstract}"
 
   logInfo "Generated abstract code is done, then split into train, test, eval dataset ..."
   OutputBuggyDir=$(cat "${ConfigAbstract}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
@@ -208,7 +211,6 @@ function _translate() {
   logInfo "------------------- Translate  ------------------------"
   beam_size=$1
   n_best=$2
-
   logInfo "Beam Size ${beam_size}, nums of best ${n_best}, best ratio match ${TranslateBestRatio}"
 
   # Test if checkpoint is set up in the config file
@@ -224,22 +226,26 @@ function _translate() {
       ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
   fi
 
-  logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
-  logInfo "The output prediction will be save to ${TranslateOutput}"
-  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -n_best "${n_best}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
 
-  # Backup all predictions txt
   step=$(echo "${ModelCheckpoint}" | awk -F'/' '{print $NF}' | cut -d'-' -f 3)
   DataOutputStepPath=${DataOutputPath}/${step}; [ -d "$DataOutputStepPath" ] || mkdir -p "$DataOutputStepPath"
   PredPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}".txt
-  cp "${TranslateOutput}" "${PredPath}"
   PredBestPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}"_best.txt
+
+  if [ "${enableTranslate}" = true ]; then
+    logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
+    logInfo "The output prediction will be save to ${TranslateOutput}"
+    onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -n_best "${n_best}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
+
+    # Backup all predictions txt
+    cp "${TranslateOutput}" "${PredPath}"
+  fi
 
   logInfo "------------------- Classification ------------------------"
   total=$(awk 'END{print NR}' "${TranslateTarget}" | awk '{print $1}')
   logInfo "Test Set: $total"
 
-  output=$(python3 "${BinPath}"/prediction_accuracy.py -output="${PredBestPath}" -src_buggy="${TranslateSource}" -src_fixed="${TranslateTarget}" -pred_fixed="${TranslateOutput}" -project_log="${LogFile}" -n_best="${n_best}" -best_ratio="${TranslateBestRatio}" 2>&1)
+  output=$(python3 "${BinPath}"/split_predictions.py -output="${PredBestPath}" -src_buggy="${TranslateSource}" -src_fixed="${TranslateTarget}" -pred_fixed="${PredPath}" -project_log="${LogFile}" -n_best="${n_best}" -best_ratio="${TranslateBestRatio}" 2>&1)
   perf=$(awk '{print $1}' <<< "$output")
   changed=$(awk '{print $2}' <<< "$output")
   bad=$(awk '{print $3}' <<< "$output")

@@ -5,8 +5,136 @@ import os
 import logging
 import sys
 from onmt.utils.scores import make_ext_evaluators
+import multiprocessing
+import math
+import concurrent.futures
+import timeit
+import urllib.request
+from multiprocessing.pool import ThreadPool
+import numpy as np
+from functools import reduce
+import collections
+
+
+import sys
+import re
+import os
 
 BASE_DIR = dirname(dirname(abspath(__file__)))
+
+
+def main(path):
+    predictions = open(path, "r").readlines()
+    predictions_asCodeLines = []
+
+    for prediction in predictions:
+        tmp = toJavaSourceCode(prediction)
+        if tmp != "":
+            predictions_asCodeLines.append(tmp)
+
+    if len(predictions_asCodeLines) == 0:
+        sys.stderr.write("All predictions contains <unk> token")
+        sys.exit(1)
+
+    predictions_asCodeLines_file = open(os.path.join(argv[1], "predictions_JavaSource.txt"), "w")
+    for predictions_asCodeLine in predictions_asCodeLines:
+        predictions_asCodeLines_file.write(predictions_asCodeLine + "\n")
+    predictions_asCodeLines_file.close()
+    sys.exit(0)
+
+
+def toJavaSourceCode(prediction):
+    tokens = prediction.strip().split(" ")
+    codeLine = ""
+    delimiter = JavaDelimiter()
+    for i in range(len(tokens)):
+        # if tokens[i] == "<unk>":
+        #     return ""
+        if i + 1 < len(tokens):
+            # DEL = delimiters
+            # ... = method_referece
+            # STR = token with alphabet in it
+
+            if not isDelimiter(tokens[i]):
+                if not isDelimiter(tokens[i + 1]):  # STR (i) + STR (i+1)
+                    codeLine = codeLine + tokens[i] + " "
+                else:  # STR(i) + DEL(i+1)
+                    codeLine = codeLine + tokens[i]
+            else:
+                if tokens[i] == delimiter.varargs:  # ... (i) + ANY (i+1)
+                    codeLine = codeLine + tokens[i] + " "
+                elif tokens[i] == delimiter.biggerThan:  # > (i) + ANY(i+1)
+                    codeLine = codeLine + tokens[i] + " "
+                elif tokens[i] == delimiter.semicolon:
+                    codeLine = codeLine + tokens[i] + " "
+                elif tokens[i] == delimiter.comma:
+                    codeLine = codeLine + tokens[i] + " "
+                elif tokens[i] == delimiter.dot:
+                    codeLine = codeLine + tokens[i]
+                elif tokens[i] == delimiter.assign:
+                    codeLine = codeLine + " " + tokens[i] + " "
+                elif tokens[i] == delimiter.leftCurlyBrackets:
+                    codeLine = codeLine + tokens[i] + " "
+                elif tokens[i] == delimiter.rightBrackets and i > 0:
+                    if tokens[i - 1] == delimiter.leftBrackets:  # [ (i-1) + ] (i)
+                        codeLine = codeLine + tokens[i] + " "
+                    else:  # DEL not([) (i-1) + ] (i)
+                        codeLine = codeLine + tokens[i]
+                else:  # DEL not(... or ]) (i) + ANY
+                    codeLine = codeLine + tokens[i]
+        else:
+            codeLine = codeLine + tokens[i]
+    return codeLine
+
+
+def isDelimiter(token):
+    return not token.upper().isupper()
+
+
+class JavaDelimiter:
+    @property
+    def varargs(self):
+        return "..."
+
+    @property
+    def rightBrackets(self):
+        return "]"
+
+    @property
+    def leftBrackets(self):
+        return "["
+
+    @property
+    def rightCurlyBrackets(self):
+        return "}"
+
+    @property
+    def leftCurlyBrackets(self):
+        return "{"
+
+    @property
+    def biggerThan(self):
+        return ">"
+
+    @property
+    def semicolon(self):
+        return ";"
+
+    @property
+    def comma(self):
+        return ","
+
+    @property
+    def dot(self):
+        return "."
+
+    @property
+    def assign(self):
+        return "="
+
+    @property
+    def left(self):
+        return "."
 
 
 def get_logger(run_name="logs", save_log=None, isDebug=False):
@@ -43,14 +171,36 @@ def get_total_nums_line(path):
     return len(open(path).readlines())
 
 
+def chunks(lst, chunk_size):
+    """Yield n chunks from lst."""
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
+
+
 class PredictionSplit(object):
     def __init__(self, opt, logger):
         self.opt = opt
         self.logging = logger
         self.args_checkup()
 
-        self.score = make_ext_evaluators(opt.measure)[0]
-        logging.info(f"The number of n_best is [{args.n_best}], and the threshold of best ratio is {args.best_ratio}")
+        self.score = make_ext_evaluators(self.opt.measure)[0]
+
+        self.src_buggy = [line.strip() for line in open(self.opt.src_buggy, 'r')]
+        self.src_fixed = [line.strip() for line in open(self.opt.src_fixed, 'r')]
+        self.pred_fixed = [line.strip() for line in open(self.opt.pred_fixed, 'r')]
+        self.n_best = self.opt.n_best
+        self.nums_buggy = len(self.src_buggy)
+        self.nums_thread = self.opt.nums_thread
+
+        logging.debug(f"The number of n_best is [{args.n_best}], "
+                      f"the threshold of best ratio is {args.best_ratio}, "
+                      f"The nums thread {self.nums_thread}")
+
+    def get_score(self, src, tgt):
+        if self.opt.measure == 'bleu':
+            return self.score([src], [tgt]) / 100
+        else:
+            return self.score(src, tgt)
 
     def args_checkup(self):
         nums_src_buggy = get_total_nums_line(self.opt.src_buggy)
@@ -71,30 +221,23 @@ class PredictionSplit(object):
         count_changed = 0
         count_bad = 0
 
-        src_buggy = [line.strip() for line in open(self.opt.src_buggy, 'r')]
-        src_fixed = [line.strip() for line in open(self.opt.src_fixed, 'r')]
-        pred_fixed = [line.strip() for line in open(self.opt.pred_fixed, 'r')]
-        n_best = self.opt.n_best
-        nums_buggy = len(src_buggy)
-
         with open(self.opt.output, 'w') as output:
-            for i in range(nums_buggy):
-                buggy = src_buggy[i]
-                fixed = src_fixed[i]
-                preds = pred_fixed[i * n_best:(i + 1) * n_best]
+            for i in range(self.nums_buggy):
+                buggy = self.src_buggy[i]
+                fixed = self.src_fixed[i]
+                preds = self.pred_fixed[i * self.n_best:(i + 1) * self.n_best]
 
                 # Reture the best score of similarity with a tuple of (index, similarity_score).
-                fixed_max_match = max([(index, self.score(fixed, tgt)) for index, tgt in enumerate(preds)],
-                                      key=itemgetter(1))
+                fixed_preds_score = [(index, self.get_score(fixed, tgt)) for index, tgt in enumerate(preds)]
+                fixed_max_match = max(fixed_preds_score, key=itemgetter(1))
 
                 # Write the best match into the file
-                if i != nums_buggy - 1:
+                if i != self.nums_buggy - 1:
                     output.write(preds[fixed_max_match[0]] + "\n")
                 else:
                     output.write(preds[fixed_max_match[0]])
-
-                buggy_max_match = max([(index, self.score(buggy, tgt)) for index, tgt in enumerate(preds)],
-                                      key=itemgetter(1))
+                buggy_preds_scores = [(index, self.get_score(buggy, tgt)) for index, tgt in enumerate(preds)]
+                buggy_max_match = max(buggy_preds_scores, key=itemgetter(1))
 
                 if fixed_max_match[1] >= self.opt.best_ratio:
                     count_perfect += 1
@@ -102,14 +245,88 @@ class PredictionSplit(object):
                     count_bad += 1
                 else:
                     count_changed += 1
+        self.logging.info(
+            f"Count Perfect[{count_perfect}], changed {count_changed}, "
+            f"bad {count_bad}, performance {(count_perfect * 1.0 / self.nums_buggy): 0.4f}")
 
         return count_perfect, count_changed, count_bad
 
+    def thread_run(self, thread_id, src_buggy, src_fixed, pred_fixed):
+        nums_buggy = len(src_buggy)
+        count_perfect = 0
+        count_changed = 0
+        count_bad = 0
+        pred_best = []
+
+        for i in range(nums_buggy):
+            buggy = src_buggy[i]
+            fixed = src_fixed[i]
+            preds = pred_fixed[i * self.n_best:(i + 1) * self.n_best]
+
+            # Reture the best score of similarity with a tuple of (index, similarity_score).
+            fixed_preds_score = [(index, self.get_score(fixed, tgt)) for index, tgt in enumerate(preds)]
+            fixed_max_match = max(fixed_preds_score, key=itemgetter(1))
+            pred_best.append(preds[fixed_max_match[0]])
+
+            buggy_preds_scores = [(index, self.get_score(buggy, tgt)) for index, tgt in enumerate(preds)]
+            buggy_max_match = max(buggy_preds_scores, key=itemgetter(1))
+
+            if fixed_max_match[1] >= self.opt.best_ratio:
+                count_perfect += 1
+            elif buggy_max_match[1] >= self.opt.best_ratio:
+                count_bad += 1
+            else:
+                count_changed += 1
+
+        self.logging.debug(
+            f"Thread[{thread_id}]: Count Perfect {count_perfect}, changed {count_changed}, "
+            f"bad {count_bad}, performance {(count_perfect * 1.0 / nums_buggy): 0.4f}")
+
+        return {thread_id: {"statistics": np.array([count_perfect, count_changed, count_bad]), "pred_best": pred_best}}
+
     def run(self):
-        return self.accuarcy()
+        return_value = dict()
+        statistics = []
+        pred_best = []
+        batch_size = math.ceil(self.nums_buggy / self.nums_thread)
+
+        buggy_chunks = chunks(self.src_buggy, batch_size)
+        fixed_chunks = chunks(self.src_fixed, batch_size)
+        pred_chunks = chunks(self.pred_fixed, batch_size * self.n_best)
+
+        # Using ThreadPoolExecutor will lead to a GIL issue and cannot run in parallel
+        # https://gist.github.com/mangecoeur/9540178
+        # https://stackoverflow.com/questions/61149803/threads-is-not-executing-in-parallel-python-with-threadpoolexecutor
+
+        with concurrent.futures.ProcessPoolExecutor(max_workers=self.nums_thread) as executor:
+            futures = {executor.submit(self.thread_run,
+                                       thread_id,
+                                       buggy,
+                                       fixed,
+                                       pred): thread_id
+                       for thread_id, (buggy, fixed, pred) in
+                       enumerate(zip(buggy_chunks, fixed_chunks, pred_chunks))}
+
+            for future in concurrent.futures.as_completed(futures, 60):
+                thread_id = futures[future]
+                try:
+                    return_value.update(future.result())
+                except Exception as exc:
+                    self.logging.error(f'Thread {thread_id} generated an exception: {exc}')
+        return_value = collections.OrderedDict(sorted(return_value.items()))
+
+        for key, value in return_value.items():
+            statistics.append(value["statistics"])
+            pred_best += value["pred_best"]
+
+        with open(self.opt.output, 'w') as output:
+            output.writelines("%s\n" % place for place in pred_best)
+
+        return reduce(lambda a, b: a + b, statistics)
 
 
 if __name__ == "__main__":
+    start = timeit.default_timer()
     parser = argparse.ArgumentParser(description='Process some integers.')
 
     parser.add_argument('-output', '--output', required=True, type=str, default='')
@@ -118,12 +335,16 @@ if __name__ == "__main__":
     parser.add_argument('-pred_fixed', '--pred_fixed', type=str, required=True)
     parser.add_argument('-n_best', '--n_best', type=int, default=1)
     parser.add_argument('-best_ratio', '--best_ratio', type=float, default=1.0)
-    parser.add_argument('-measure', '--measure', type=str, default='similarity', choices=['similarity', 'ast', 'bleu'])
+    parser.add_argument('-measure', '--measure', type=str, default='bleu', choices=['similarity', 'ast', 'bleu'])
+    parser.add_argument('-nums_thread', '--nums_thread', type=int, default=32)
     parser.add_argument('-project_log', '--project_log', type=str, default='log.txt')
     parser.add_argument('-debug', '--debug', type=bool, default=False)
     args = parser.parse_args()
+
     logging = get_logger(save_log=args.project_log, isDebug=args.debug)
     predictor = PredictionSplit(args, logging)
-    count_perfect, count_changed, count_bad = predictor.run()
-
-    sys.exit((str(count_perfect) + " " + str(count_changed) + " " + str(count_bad)))
+    # count_perfect, count_changed, count_bad = predictor.run()
+    main(args.src_buggy)
+    stop = timeit.default_timer()
+    logging.debug(f'Executing Time: {stop - start}')
+    # sys.exit((str(count_perfect) + " " + str(count_changed) + " " + str(count_bad)))
