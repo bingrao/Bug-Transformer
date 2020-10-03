@@ -1,7 +1,7 @@
 configargparse~=1.1
 flask~=1.1.2
 waitress~=1.4.3
-torchtext~=0.4.0
+torchtext~=0.6.0
 numpy~=1.18.1
 six~=1.14.0
 tqdm~=4.30.0
@@ -12,3 +12,5 @@ setuptools~=46.4.0
 torch~=1.4.0
 rouge~=1.0.0
 sacrebleu~=1.4.3
+networkx~=2.5
+py4j~=0.10.9

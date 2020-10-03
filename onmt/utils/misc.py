@@ -15,6 +15,30 @@ import io
 
 import numpy as np
 
+from subprocess import *
+import subprocess
+
+def jarWrapper(*args):
+    process = Popen(['scala', '-jar'] + list(args), stdout=PIPE, stderr=PIPE)
+    ret = []
+    while process.poll() is None:
+        line = process.stdout.readline()
+        if line != '' and line.endswith('\n'):
+            ret.append(line[:-1])
+    stdout, stderr = process.communicate()
+    ret += stdout.split('\n')
+    if stderr != '':
+        ret += stderr.split('\n')
+    ret.remove('')
+    return ret
+
+def call_subprocess(args):
+    return subprocess.call(args)
+
+
+
+
+
 class ClassRegistry(object):
     """Helper class to create a registry of classes."""
 
@@ -133,11 +157,11 @@ def tile(x, count, dim=0):
     out_size[0] *= count
     batch = x.size(0)
     x = x.view(batch, -1) \
-         .transpose(0, 1) \
-         .repeat(count, 1) \
-         .transpose(0, 1) \
-         .contiguous() \
-         .view(*out_size)
+        .transpose(0, 1) \
+        .repeat(count, 1) \
+        .transpose(0, 1) \
+        .contiguous() \
+        .view(*out_size)
     if dim != 0:
         x = x.permute(perm).contiguous()
     return x
@@ -148,7 +172,7 @@ def use_gpu(opt):
     Creates a boolean if gpu used
     """
     return (hasattr(opt, 'gpu_ranks') and len(opt.gpu_ranks) > 0) or \
-        (hasattr(opt, 'gpu') and opt.gpu > -1)
+           (hasattr(opt, 'gpu') and opt.gpu > -1)
 
 
 def set_random_seed(seed, is_cuda):
@@ -172,7 +196,7 @@ def generate_relative_positions_matrix(length, max_relative_positions,
     """Generate the clipped relative positions matrix
        for a given length and maximum relative positions"""
     if cache:
-        distance_mat = torch.arange(-length+1, 1, 1).unsqueeze(0)
+        distance_mat = torch.arange(-length + 1, 1, 1).unsqueeze(0)
     else:
         range_vec = torch.arange(length)
         range_mat = range_vec.unsqueeze(-1).expand(-1, length).transpose(0, 1)

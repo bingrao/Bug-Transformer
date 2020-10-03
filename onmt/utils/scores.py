@@ -5,6 +5,8 @@ from sacrebleu import corpus_bleu
 from onmt.utils import ClassRegistry
 from difflib import SequenceMatcher
 
+from onmt.utils.misc import call_subprocess
+
 
 class Scorer(abc.ABC):
     """Scores hypotheses against references."""
@@ -84,8 +86,8 @@ class ASTScorer(Scorer):
     def __init__(self):
         super(ASTScorer, self).__init__("ast")
 
-    def __call__(self, ref, hyp):
-        pass
+    def __call__(self, args):
+        return call_subprocess(args)
 
 
 @register_scorer(name="similarity")

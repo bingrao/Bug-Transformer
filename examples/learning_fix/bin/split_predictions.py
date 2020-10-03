@@ -4,6 +4,8 @@ from operator import itemgetter
 import os
 import logging
 import sys
+
+from onmt.utils.misc import jarWrapper, call_subprocess
 from onmt.utils.scores import make_ext_evaluators
 import multiprocessing
 import math
@@ -20,75 +22,8 @@ import sys
 import re
 import os
 
+
 BASE_DIR = dirname(dirname(abspath(__file__)))
-
-
-def main(path):
-    predictions = open(path, "r").readlines()
-    predictions_asCodeLines = []
-
-    for prediction in predictions:
-        tmp = toJavaSourceCode(prediction)
-        if tmp != "":
-            predictions_asCodeLines.append(tmp)
-
-    if len(predictions_asCodeLines) == 0:
-        sys.stderr.write("All predictions contains <unk> token")
-        sys.exit(1)
-
-    predictions_asCodeLines_file = open(os.path.join(argv[1], "predictions_JavaSource.txt"), "w")
-    for predictions_asCodeLine in predictions_asCodeLines:
-        predictions_asCodeLines_file.write(predictions_asCodeLine + "\n")
-    predictions_asCodeLines_file.close()
-    sys.exit(0)
-
-
-def toJavaSourceCode(prediction):
-    tokens = prediction.strip().split(" ")
-    codeLine = ""
-    delimiter = JavaDelimiter()
-    for i in range(len(tokens)):
-        # if tokens[i] == "<unk>":
-        #     return ""
-        if i + 1 < len(tokens):
-            # DEL = delimiters
-            # ... = method_referece
-            # STR = token with alphabet in it
-
-            if not isDelimiter(tokens[i]):
-                if not isDelimiter(tokens[i + 1]):  # STR (i) + STR (i+1)
-                    codeLine = codeLine + tokens[i] + " "
-                else:  # STR(i) + DEL(i+1)
-                    codeLine = codeLine + tokens[i]
-            else:
-                if tokens[i] == delimiter.varargs:  # ... (i) + ANY (i+1)
-                    codeLine = codeLine + tokens[i] + " "
-                elif tokens[i] == delimiter.biggerThan:  # > (i) + ANY(i+1)
-                    codeLine = codeLine + tokens[i] + " "
-                elif tokens[i] == delimiter.semicolon:
-                    codeLine = codeLine + tokens[i] + " "
-                elif tokens[i] == delimiter.comma:
-                    codeLine = codeLine + tokens[i] + " "
-                elif tokens[i] == delimiter.dot:
-                    codeLine = codeLine + tokens[i]
-                elif tokens[i] == delimiter.assign:
-                    codeLine = codeLine + " " + tokens[i] + " "
-                elif tokens[i] == delimiter.leftCurlyBrackets:
-                    codeLine = codeLine + tokens[i] + " "
-                elif tokens[i] == delimiter.rightBrackets and i > 0:
-                    if tokens[i - 1] == delimiter.leftBrackets:  # [ (i-1) + ] (i)
-                        codeLine = codeLine + tokens[i] + " "
-                    else:  # DEL not([) (i-1) + ] (i)
-                        codeLine = codeLine + tokens[i]
-                else:  # DEL not(... or ]) (i) + ANY
-                    codeLine = codeLine + tokens[i]
-        else:
-            codeLine = codeLine + tokens[i]
-    return codeLine
-
-
-def isDelimiter(token):
-    return not token.upper().isupper()
 
 
 class JavaDelimiter:
@@ -192,6 +127,10 @@ class PredictionSplit(object):
         self.nums_buggy = len(self.src_buggy)
         self.nums_thread = self.opt.nums_thread
 
+        self.jar_exe_args = ['scala', f'-Dlog4j.configuration=file://{self.opt.log4j_config}', self.opt.jar, 'astdiff']
+
+        self.delimiter = JavaDelimiter()
+
         logging.debug(f"The number of n_best is [{args.n_best}], "
                       f"the threshold of best ratio is {args.best_ratio}, "
                       f"The nums thread {self.nums_thread}")
@@ -199,6 +138,11 @@ class PredictionSplit(object):
     def get_score(self, src, tgt):
         if self.opt.measure == 'bleu':
             return self.score([src], [tgt]) / 100
+        elif self.opt.measure == 'ast':
+            args = self.jar_exe_args + [src] + [tgt]
+            nums = self.score(args)
+            total = nums / ((len(src.split()) + len(src.split())) / 2)
+            return 1.0 - total
         else:
             return self.score(src, tgt)
 
@@ -216,38 +160,20 @@ class PredictionSplit(object):
                                f"with nums of best[{nums_best}]")
             exit(-1)
 
-    def accuarcy(self):
-        count_perfect = 0
-        count_changed = 0
-        count_bad = 0
+    def debug_accuarcy(self):
+        result = self.thread_run(0, self.src_buggy, self.src_fixed, self.pred_fixed)
 
-        with open(self.opt.output, 'w') as output:
-            for i in range(self.nums_buggy):
-                buggy = self.src_buggy[i]
-                fixed = self.src_fixed[i]
-                preds = self.pred_fixed[i * self.n_best:(i + 1) * self.n_best]
-
-                # Reture the best score of similarity with a tuple of (index, similarity_score).
-                fixed_preds_score = [(index, self.get_score(fixed, tgt)) for index, tgt in enumerate(preds)]
-                fixed_max_match = max(fixed_preds_score, key=itemgetter(1))
-
-                # Write the best match into the file
-                if i != self.nums_buggy - 1:
-                    output.write(preds[fixed_max_match[0]] + "\n")
-                else:
-                    output.write(preds[fixed_max_match[0]])
-                buggy_preds_scores = [(index, self.get_score(buggy, tgt)) for index, tgt in enumerate(preds)]
-                buggy_max_match = max(buggy_preds_scores, key=itemgetter(1))
-
-                if fixed_max_match[1] >= self.opt.best_ratio:
-                    count_perfect += 1
-                elif buggy_max_match[1] >= self.opt.best_ratio:
-                    count_bad += 1
-                else:
-                    count_changed += 1
+        count_perfect, count_changed, count_bad = result["statistics"]
         self.logging.info(
             f"Count Perfect[{count_perfect}], changed {count_changed}, "
             f"bad {count_bad}, performance {(count_perfect * 1.0 / self.nums_buggy): 0.4f}")
+
+
+        pred_best = result["pred_best"]
+        with open(self.opt.output, 'w') as output:
+            output.writelines("%s\n" % place for place in pred_best)
+
+
 
         return count_perfect, count_changed, count_bad
 
@@ -283,6 +209,72 @@ class PredictionSplit(object):
             f"bad {count_bad}, performance {(count_perfect * 1.0 / nums_buggy): 0.4f}")
 
         return {thread_id: {"statistics": np.array([count_perfect, count_changed, count_bad]), "pred_best": pred_best}}
+
+    def retrieve_java_code(self, path):
+        predictions = open(path, "r").readlines()
+        predictions_asCodeLines = []
+
+        for prediction in predictions:
+            tmp = self.retrieve_single_java_source(prediction)
+            if tmp != "":
+                predictions_asCodeLines.append(tmp)
+
+        if len(predictions_asCodeLines) == 0:
+            sys.stderr.write("All predictions contains <unk> token")
+            sys.exit(1)
+
+        predictions_asCodeLines_file = open(os.path.join(self.opt.output, "predictions_JavaSource.txt"), "w")
+        for predictions_asCodeLine in predictions_asCodeLines:
+            predictions_asCodeLines_file.write(predictions_asCodeLine + "\n")
+        predictions_asCodeLines_file.close()
+        sys.exit(0)
+
+    def retrieve_single_java_source(self, prediction):
+        tokens = prediction.strip().split(" ")
+        codeLine = ""
+
+        for i in range(len(tokens)):
+            # if tokens[i] == "<unk>":
+            #     return ""
+            if i + 1 < len(tokens):
+                # DEL = delimiters
+                # ... = method_referece
+                # STR = token with alphabet in it
+
+                if not self.isDelimiter(tokens[i]):
+                    if not self.isDelimiter(tokens[i + 1]):  # STR (i) + STR (i+1)
+                        codeLine = codeLine + tokens[i] + " "
+                    else:  # STR(i) + DEL(i+1)
+                        codeLine = codeLine + tokens[i]
+                else:
+                    if tokens[i] == self.delimiter.varargs:  # ... (i) + ANY (i+1)
+                        codeLine = codeLine + tokens[i] + " "
+                    elif tokens[i] == self.delimiter.biggerThan:  # > (i) + ANY(i+1)
+                        codeLine = codeLine + tokens[i] + " "
+                    elif tokens[i] == self.delimiter.semicolon:
+                        codeLine = codeLine + tokens[i] + " "
+                    elif tokens[i] == self.delimiter.comma:
+                        codeLine = codeLine + tokens[i] + " "
+                    elif tokens[i] == self.delimiter.dot:
+                        codeLine = codeLine + tokens[i]
+                    elif tokens[i] == self.delimiter.assign:
+                        codeLine = codeLine + " " + tokens[i] + " "
+                    elif tokens[i] == self.delimiter.leftCurlyBrackets:
+                        codeLine = codeLine + tokens[i] + " "
+                    elif tokens[i] == self.delimiter.rightBrackets and i > 0:
+                        if tokens[i - 1] == self.delimiter.leftBrackets:  # [ (i-1) + ] (i)
+                            codeLine = codeLine + tokens[i] + " "
+                        else:  # DEL not([) (i-1) + ] (i)
+                            codeLine = codeLine + tokens[i]
+                    else:  # DEL not(... or ]) (i) + ANY
+                        codeLine = codeLine + tokens[i]
+            else:
+                codeLine = codeLine + tokens[i]
+        return codeLine
+
+    @staticmethod
+    def isDelimiter(token):
+        return not token.upper().isupper()
 
     def run(self):
         return_value = dict()
@@ -338,13 +330,25 @@ if __name__ == "__main__":
     parser.add_argument('-measure', '--measure', type=str, default='bleu', choices=['similarity', 'ast', 'bleu'])
     parser.add_argument('-nums_thread', '--nums_thread', type=int, default=32)
     parser.add_argument('-project_log', '--project_log', type=str, default='log.txt')
+
+    parser.add_argument('-log4j_config', '--log4j_config', type=str, required=False,
+                        default='/home/bing/project/OpenNMT-py/examples/learning_fix/config/log4j.properties')
+
+    parser.add_argument('-jar', '--jar', type=str, required=False,
+                        default='/home/bing/project/OpenNMT-py/examples/learning_fix/bin/java_abstract-1.0-jar-with'
+                                '-dependencies.jar')
     parser.add_argument('-debug', '--debug', type=bool, default=False)
     args = parser.parse_args()
 
     logging = get_logger(save_log=args.project_log, isDebug=args.debug)
     predictor = PredictionSplit(args, logging)
-    # count_perfect, count_changed, count_bad = predictor.run()
-    main(args.src_buggy)
-    stop = timeit.default_timer()
-    logging.debug(f'Executing Time: {stop - start}')
-    # sys.exit((str(count_perfect) + " " + str(count_changed) + " " + str(count_bad)))
+
+    # Debug code
+    # predictor.debug_accuarcy()
+
+    count_perfect, count_changed, count_bad = predictor.run()
+
+    predictor.retrieve_java_code(args.src_buggy)
+
+    logging.debug(f'Executing Time: {timeit.default_timer() - start}')
+    sys.exit((str(count_perfect) + " " + str(count_changed) + " " + str(count_bad)))
