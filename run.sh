@@ -26,6 +26,9 @@ fi
 dataset=$1
 target=$2
 configFile=$3
+
+enableTranslate=true  # Available options: true, false
+
 prefix="${dataset}-$target-$(echo "${configFile}" | cut -d'.' -f1)"
 
 config_index=$(echo "${configFile}" |  tr -dc '0-9')
@@ -40,9 +43,9 @@ function logInfo() {
     echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
 }
 if [ "$target" != "abstract" ]; then
-  logInfo "[$(date +"%F %T,%3N") INFO] Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
+  logInfo "Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
   $(echo "$configFile" | grep -Eq  '*_[0-9]+\.yml'$) || exit 1
-  logInfo "[$(date +"%F %T,%3N") INFO] Config file name is good"
+  logInfo "Config file name is good"
 fi
 
 
@@ -134,8 +137,8 @@ function _abstract() {
       logInfo "$ConfigAbstract does not exist."
       exit 1
   fi
-  export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M"
-  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "${ConfigAbstract}"
+  export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M -Dlog4j.configuration=file:///${ConfigPath}/log4j.properties"
+  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "abstract" "${ConfigAbstract}" | tee -a "${LogFile}"
 
   logInfo "Generated abstract code is done, then split into train, test, eval dataset ..."
   OutputBuggyDir=$(cat "${ConfigAbstract}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
@@ -205,11 +208,9 @@ function _preprocess() {
 }
 
 function _translate() {
-  logInfo "------------------- Translate  ------------------------"
   beam_size=$1
   n_best=$2
-
-  logInfo "Beam Size ${beam_size}, nums of best ${n_best}, best ratio match ${TranslateBestRatio}"
+  logInfo "Beam Size ${beam_size}, nums of best ${n_best}"
 
   # Test if checkpoint is set up in the config file
   if [ -z "$(parse_yaml "${ConfigFile}" "translate" "model")" ]
@@ -224,30 +225,52 @@ function _translate() {
       ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
   fi
 
-  logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
-  logInfo "The output prediction will be save to ${TranslateOutput}"
-  onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -n_best "${n_best}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
 
-  # Backup all predictions txt
   step=$(echo "${ModelCheckpoint}" | awk -F'/' '{print $NF}' | cut -d'-' -f 3)
   DataOutputStepPath=${DataOutputPath}/${step}; [ -d "$DataOutputStepPath" ] || mkdir -p "$DataOutputStepPath"
-  PredPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}".txt
-  cp "${TranslateOutput}" "${PredPath}"
+  PredBackupPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}".txt
   PredBestPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}"_best.txt
+
+  if [ "${enableTranslate}" = true ]; then
+    logInfo "------------------- Translate  ------------------------"
+    logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
+    logInfo "The output prediction will be save to ${TranslateOutput}"
+    onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -n_best "${n_best}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
+
+    # Backup all predictions txt
+    logInfo "Backup the model output to ${PredBackupPath}"
+    cp "${TranslateOutput}" "${PredBackupPath}"
+  fi
 
   logInfo "------------------- Classification ------------------------"
   total=$(awk 'END{print NR}' "${TranslateTarget}" | awk '{print $1}')
-  logInfo "Test Set: $total"
-
-  output=$(python3 "${BinPath}"/prediction_accuracy.py -output="${PredBestPath}" -src_buggy="${TranslateSource}" -src_fixed="${TranslateTarget}" -pred_fixed="${TranslateOutput}" -project_log="${LogFile}" -n_best="${n_best}" -best_ratio="${TranslateBestRatio}" 2>&1)
+  measure='similarity'  # avaialble options: 'similarity', 'ast', 'bleu'
+  nums_thread=32
+  logInfo "Get best prediction results using n_best [${n_best}], best_ratio [${TranslateBestRatio}], measure [${measure}], nums_thread [${nums_thread}]"
+#  set -x
+  output=$(python "${BinPath}"/split_predictions.py \
+      -output="${PredBestPath}" \
+      -src_buggy="${TranslateSource}" \
+      -src_fixed="${TranslateTarget}" \
+      -pred_fixed="${PredBackupPath}" \
+      -project_log="${LogFile}" \
+      -n_best="${n_best}" \
+      -best_ratio="${TranslateBestRatio}" \
+      -log4j_config="${ConfigPath}"/log4j.properties \
+      -jar="${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar \
+      -nums_thread=${nums_thread} \
+      -measure=${measure} 2>&1)
+#  set +x
   perf=$(awk '{print $1}' <<< "$output")
   changed=$(awk '{print $2}' <<< "$output")
   bad=$(awk '{print $3}' <<< "$output")
   perf_perc="$(echo "scale=2; $perf * 100 / $total" | bc)"
 
-  logInfo "Perf: $perf ($perf_perc%)"
-  logInfo "Pot : $changed"
-  logInfo "Bad : $bad"
+  logInfo "Perf  : $perf ($perf_perc%)"
+  logInfo "Pot   : $changed"
+  logInfo "Bad   : $bad"
+  logInfo "--------------------"
+  logInfo "Total : $total"
 
 
   logInfo "------------------- Bleu ------------------------"
@@ -261,7 +284,8 @@ function _translate() {
 
 function _inference(){
   logInfo "------------------- Inference Search ------------------------"
-  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
+#  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
+  beam_widths=("1" "10" "20" "30" "40" "50")
   for beam_width in ${beam_widths[*]}
   do
     logInfo "******************** Beam width: $beam_width ********************"

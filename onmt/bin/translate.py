@@ -15,9 +15,9 @@ def translate(opt):
     ArgumentParser.validate_translate_opts(opt)
     logger = init_logger(opt.log_file)
 
-    logger.info("The Input Parameters:")
+    logger.debug("The Input Parameters:")
     for key, val in vars(opt).items():
-        logger.info(f"[Config]: {key} => {val}")
+        logger.debug(f"[Config]: {key} => {val}")
 
     translator = build_translator(opt, report_score=True)
     # A list of line in opt.src

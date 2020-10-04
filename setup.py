@@ -31,6 +31,11 @@ setup(
         "waitress",
         "pyonmttok==1.*;platform_system=='Linux'",
         "pyyaml",
+        "rouge",
+        "sacrebleu",
+        "pillow",
+        "py4j",
+        "networkx"
     ],
     entry_points={
         "console_scripts": [

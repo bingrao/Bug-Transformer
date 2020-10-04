@@ -328,7 +328,7 @@ if __name__ == "__main__":
     parser.add_argument('-n_best', '--n_best', type=int, default=1)
     parser.add_argument('-best_ratio', '--best_ratio', type=float, default=1.0)
     parser.add_argument('-measure', '--measure', type=str, default='bleu', choices=['similarity', 'ast', 'bleu'])
-    parser.add_argument('-nums_thread', '--nums_thread', type=int, default=32)
+    parser.add_argument('-nums_thread', '--nums_thread', type=int, default=16)
     parser.add_argument('-project_log', '--project_log', type=str, default='log.txt')
 
     parser.add_argument('-log4j_config', '--log4j_config', type=str, required=False,
@@ -348,7 +348,7 @@ if __name__ == "__main__":
 
     count_perfect, count_changed, count_bad = predictor.run()
 
-    predictor.retrieve_java_code(args.src_buggy)
+    # predictor.retrieve_java_code(args.src_buggy)
 
     logging.debug(f'Executing Time: {timeit.default_timer() - start}')
     sys.exit((str(count_perfect) + " " + str(count_changed) + " " + str(count_bad)))
