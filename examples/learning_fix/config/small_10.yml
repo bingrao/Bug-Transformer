@@ -5,8 +5,8 @@ preprocess:
   valid_src: examples/learning_fix/data/small/eval-buggy.txt
   valid_tgt: examples/learning_fix/data/small/eval-fixed.txt
   save_data: examples/learning_fix/data/small/small
-  src_seq_length: 46679
-  tgt_seq_length: 46679
+  src_seq_length: 46680
+  tgt_seq_length: 46680
   src_seq_length_trunc: 400
   tgt_seq_length_trunc: 200
   num_threads: 10
@@ -18,7 +18,6 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  save_model: examples/learning_fix/data/small/10/small
   save_checkpoint_steps: 1000
   keep_checkpoint: 10
   seed: 3435
@@ -42,13 +41,13 @@ train:
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
-  learning_rate: 0.1
+  learning_rate: 0.01
   max_grad_norm: 5
 
   batch_size: 4096
   batch_type: tokens
   normalization: tokens
-  dropout: 0.3
+  dropout: 0.2
   label_smoothing: 0.1
 
   max_generator_batches: 2
@@ -66,10 +65,9 @@ train:
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/small/10/small-step-24000-acc-96.74-ppl-1.12-xent-0.11.pt
+  model: examples/learning_fix/data/small/11/small-step-34000-acc-93.67-ppl-1.26-xent-0.23.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
-  output: examples/learning_fix/data/small/10/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0

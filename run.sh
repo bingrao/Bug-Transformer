@@ -27,27 +27,27 @@ dataset=$1
 target=$2
 configFile=$3
 
-enableTranslate=true  # Available options: true, false
-
 prefix="${dataset}-$target-$(echo "${configFile}" | cut -d'.' -f1)"
 
 config_index=$(echo "${configFile}" |  tr -dc '0-9')
 
-DataOutputPath=${DataPath}/${dataset}/${config_index}; [ -d "$DataOutputPath" ] || mkdir -p "$DataOutputPath"
-
 # Log file
 LogFile=${LogPath}/${CurrentDate}-${prefix}.log
-#TensorboardDir=${LogPath}/${CurrentDate}-${prefix}; [ -d "$TensorboardDir" ] || mkdir -p "$TensorboardDir"
+
+#######################################################################################################
+######################################## Helper functions  ############################################
+#######################################################################################################
 
 function logInfo() {
     echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
 }
+
 if [ "$target" != "abstract" ]; then
   logInfo "Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
   $(echo "$configFile" | grep -Eq  '*_[0-9]+\.yml'$) || exit 1
-  logInfo "Config file name is good"
 fi
 
+logInfo "Check Config file \"${configFile}\" -------- Pass"
 
 # Config files for model data preprocess, train, translate
 ConfigFile=${ConfigPath}/${configFile}
@@ -97,52 +97,15 @@ function parse_yaml() {
    echo "${reg}"
 }
 
-
-######### Internal Special parameters for model translate ###################
-
-# The buggy code (source) to translate task
-TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
-
-# The fixed code (target) to translate task
-TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
-
-# The model predict output, each line is corresponding to the line in buggy code
-TranslateOutput=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "output")
-[ -z "${TranslateOutput}" ] && TranslateOutput=${DataOutputPath}/predictions.txt
-
-ModelCheckpointPrefix=${RootPath}/"$(parse_yaml "${ConfigFile}" "train" "save_model")"
-[ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset}
-
-# The beam size for prediction
-
-TranslateBeamSize=$(parse_yaml "${ConfigFile}" "translate" "beam_size")
-[ -z "${TranslateBeamSize}" ] &&  TranslateBeamSize=10
-
-TranslateNBest=$(parse_yaml "${ConfigFile}" "translate" "n_best")
-[ -z "${TranslateNBest}" ] && TranslateNBest=10
-
-TranslateBestRatio=1.0
-
-#####################################################################
-########################### Helper functions  #######################
-#####################################################################
-
 function _abstract() {
   logInfo "------------------- Code Abstract ------------------------"
-  # Config file for scala application to generate abstract code
-  ConfigAbstract=${ConfigPath}/application_${dataset}.conf
-  if [ -f "$ConfigAbstract" ]; then
-      logInfo "$ConfigAbstract exists."
-  else
-      logInfo "$ConfigAbstract does not exist."
-      exit 1
-  fi
+
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M -Dlog4j.configuration=file:///${ConfigPath}/log4j.properties"
-  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "abstract" "${ConfigAbstract}" | tee -a "${LogFile}"
+  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "abstract" "${ConfigFile}" | tee -a "${LogFile}"
 
   logInfo "Generated abstract code is done, then split into train, test, eval dataset ..."
-  OutputBuggyDir=$(cat "${ConfigAbstract}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
-  OutputFixedDir=$(cat "${ConfigAbstract}" | grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+  OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+  OutputFixedDir=$(cat "${ConfigFile}" | grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
 
   OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
   OutputFixedFile=${OutputFixedDir}/total/fixed.txt
@@ -191,6 +154,13 @@ function _abstract() {
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt | tee -a "${LogFile}"
 }
 
+
+function _preprocess() {
+  logInfo "------------------- Preprocess  ------------------------"
+  onmt_preprocess -config "${ConfigFile}" -log_file "${LogFile}"
+}
+
+
 function _train() {
   logInfo "------------------- Training ------------------------"
   # The numbers of GPU nodes used for training task
@@ -199,17 +169,35 @@ function _train() {
   [[ -z "${CUDA_VISIBLE_DEVICES}" ]] && export CUDA_VISIBLE_DEVICES=$(seq -s, 0 "${Nums_GPU}") || logInfo "exist: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
   logInfo "The checkpoint will be saved with prefix ${ModelCheckpointPrefix}"
   onmt_train -save_model "${ModelCheckpointPrefix}" -config "${ConfigFile}" -log_file "${LogFile}"
-  #-tensorboard -tensorboard_log_dir "${TensorboardDir}"
-}
-
-function _preprocess() {
-  logInfo "------------------- Preprocess  ------------------------"
-  onmt_preprocess -config "${ConfigFile}" -log_file "${LogFile}"
 }
 
 function _translate() {
+
   beam_size=$1
   n_best=$2
+  TranslateBestRatio=$3
+  enableTranslate=true  # Available options: true, false
+  measure='similarity'  # The measure using in classification task, avaialble options: 'similarity', 'ast', 'bleu'
+  nums_thread=32  # Nums of thread to conduct classification tasks
+  logInfo "------------------- Translate  ------------------------"
+  ######### Internal Special parameters for model translate ###################
+  SECONDS=0
+  DataOutputPath=${DataPath}/${dataset}/${config_index}; [ -d "$DataOutputPath" ] || mkdir -p "$DataOutputPath"
+
+  # The buggy code (source) to translate task
+  TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
+
+  # The fixed code (target) to translate task
+  TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
+
+  # The model predict output, each line is corresponding to the line in buggy code
+  TranslateOutput=$(parse_yaml "${ConfigFile}" "translate" "output")
+  [ -z "${TranslateOutput}" ] && TranslateOutput=${DataOutputPath}/predictions.txt || TranslateOutput=${RootPath}/${TranslateOutput}
+
+
+  ModelCheckpointPrefix="$(parse_yaml "${ConfigFile}" "train" "save_model")"
+  [ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset} || ModelCheckpointPrefix=${RootPath}/${ModelCheckpointPrefix}
+
   logInfo "Beam Size ${beam_size}, nums of best ${n_best}"
 
   # Test if checkpoint is set up in the config file
@@ -232,22 +220,19 @@ function _translate() {
   PredBestPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}"_best.txt
 
   if [ "${enableTranslate}" = true ]; then
-    logInfo "------------------- Translate  ------------------------"
     logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
     logInfo "The output prediction will be save to ${TranslateOutput}"
     onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -n_best "${n_best}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
 
     # Backup all predictions txt
     logInfo "Backup the model output to ${PredBackupPath}"
-    cp "${TranslateOutput}" "${PredBackupPath}"
+    mv "${TranslateOutput}" "${PredBackupPath}"
   fi
 
   logInfo "------------------- Classification ------------------------"
   total=$(awk 'END{print NR}' "${TranslateTarget}" | awk '{print $1}')
-  measure='similarity'  # avaialble options: 'similarity', 'ast', 'bleu'
-  nums_thread=32
   logInfo "Get best prediction results using n_best [${n_best}], best_ratio [${TranslateBestRatio}], measure [${measure}], nums_thread [${nums_thread}]"
-#  set -x
+
   output=$(python "${BinPath}"/split_predictions.py \
       -output="${PredBestPath}" \
       -src_buggy="${TranslateSource}" \
@@ -260,7 +245,7 @@ function _translate() {
       -jar="${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar \
       -nums_thread=${nums_thread} \
       -measure=${measure} 2>&1)
-#  set +x
+
   perf=$(awk '{print $1}' <<< "$output")
   changed=$(awk '{print $2}' <<< "$output")
   bad=$(awk '{print $3}' <<< "$output")
@@ -280,35 +265,39 @@ function _translate() {
   logInfo "prediction vs fixed"
   "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${PredBestPath}" | tee -a "${LogFile}"
 
+
+  elapsed=$SECONDS
+  logInfo "---------- Time report ----------"
+	logInfo "Total seconds: $elapsed"
+
+  total=$(awk 'END{print NR}' "${TranslateSource}" | awk '{print $1}')
+  patches=$((total * beam_size))
+  avg="$(echo "scale=6; $elapsed / $patches" | bc)"
+  avg_bug="$(echo "scale=6; $elapsed / $total" | bc)"
+
+  logInfo "Total bugs: $total"
+  logInfo "Total patches: $patches"
+  logInfo "Avg patch/sec: $avg"
+  logInfo "Avg bug/sec: $avg_bug"
+
 }
 
-function _inference(){
+function _inference() {
+  TranslateBestRatio=1.0
+
   logInfo "------------------- Inference Search ------------------------"
 #  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
-  beam_widths=("1" "10" "20" "30" "40" "50")
+  beam_widths=("1" "5" "10" "15" "20")
   for beam_width in ${beam_widths[*]}
   do
-    logInfo "******************** Beam width: $beam_width ********************"
-    SECONDS=0
-    _translate "${beam_width}" "${beam_width}"
-    elapsed=$SECONDS
-    logInfo "---------- Time report ----------"
-	  logInfo "Total seconds: $elapsed"
-
-    total=$(awk 'END{print NR}' "${TranslateSource}" | awk '{print $1}')
-    patches=$((total * beam_width))
-    avg="$(echo "scale=6; $elapsed / $patches" | bc)"
-    avg_bug="$(echo "scale=6; $elapsed / $total" | bc)"
-
-    logInfo "Total bugs: $total"
-    logInfo "Total patches: $patches"
-    logInfo "Avg patch/sec: $avg"
-    logInfo "Avg bug/sec: $avg_bug"
-
-    rm -fr "${TranslateOutput}"
+    _translate "${beam_width}" "${beam_width}" "${TranslateBestRatio}"
     printf "\n\n" | tee -a "${LogFile}"
   done
 }
+
+##################################################################################################
+##################################### Main Function ##############################################
+##################################################################################################
 
 case ${target} in
    "abstract")
@@ -324,7 +313,15 @@ case ${target} in
    ;;
 
    "translate")
-      _translate ${TranslateBeamSize} "${TranslateNBest}"
+      # The beam size for prediction
+      TranslateBeamSize=$(parse_yaml "${ConfigFile}" "translate" "beam_size")
+      [ -z "${TranslateBeamSize}" ] &&  TranslateBeamSize=1
+
+      TranslateNBest=$(parse_yaml "${ConfigFile}" "translate" "n_best")
+      [ -z "${TranslateNBest}" ] && TranslateNBest=1
+
+      TranslateBestRatio=1.0
+      _translate ${TranslateBeamSize} "${TranslateNBest}" "${TranslateBestRatio}"
    ;;
 
    "all")
