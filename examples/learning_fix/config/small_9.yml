@@ -18,7 +18,7 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  train_from: examples/learning_fix/data/small/10/small-step-79000-acc-95.28-ppl-1.18-xent-0.17.pt
+#  train_from: examples/learning_fix/data/small/10/small-step-79000-acc-95.28-ppl-1.18-xent-0.17.pt
   save_checkpoint_steps: 1000
   keep_checkpoint: 30
   seed: 3435
