@@ -34,6 +34,8 @@ config_index=$(echo "${configFile}" |  tr -dc '0-9')
 # Log file
 LogFile=${LogPath}/${CurrentDate}-${prefix}.log
 
+DataOutputPath=${DataPath}/${dataset}/${config_index}; [ -d "$DataOutputPath" ] || mkdir -p "$DataOutputPath"
+
 #######################################################################################################
 ######################################## Helper functions  ############################################
 #######################################################################################################
@@ -163,6 +165,9 @@ function _preprocess() {
 
 function _train() {
   logInfo "------------------- Training ------------------------"
+  ModelCheckpointPrefix="$(parse_yaml "${ConfigFile}" "train" "save_model")"
+  [ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset} || ModelCheckpointPrefix=${RootPath}/${ModelCheckpointPrefix}
+
   # The numbers of GPU nodes used for training task
   Nums_GPU=$(parse_yaml "${ConfigFile}" "train" "world_size")
   logInfo "Using ${Nums_GPU} for training task ... "
@@ -182,7 +187,6 @@ function _translate() {
   logInfo "------------------- Translate  ------------------------"
   ######### Internal Special parameters for model translate ###################
   SECONDS=0
-  DataOutputPath=${DataPath}/${dataset}/${config_index}; [ -d "$DataOutputPath" ] || mkdir -p "$DataOutputPath"
 
   # The buggy code (source) to translate task
   TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
