@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
+dataset=$1
+target=$2
+configFile=$3
+
 ############################# Root envs ############################
 RootPath=$(pwd)
 ProjectPath=${RootPath}/examples/learning_fix
-ConfigPath=${ProjectPath}/config; [ -d "$ConfigPath" ] || mkdir -p "$ConfigPath"
+ConfigPath=${ProjectPath}/config/${dataset}; [ -d "$ConfigPath" ] || mkdir -p "$ConfigPath"
 BinPath=${ProjectPath}/bin; [ -d "$BinPath" ] || mkdir -p "$BinPath"
 LogPath=${ProjectPath}/logs; [ -d "$LogPath" ] || mkdir -p "$LogPath"
 DataPath=${ProjectPath}/data; [ -d "$DataPath" ] || mkdir -p "$DataPath"
@@ -12,6 +16,7 @@ CurrentDate=$(date +%F)
 function help() {
      echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset[small|median|big|small_old] target[abstract|preprocess|train|translate|all|inference] configFile" >&2
      echo "Example: Using third (or first by default) GPU to train small dataset with small_1.yml config file"
+     echo "Example: The default direcotry that system searches config files: ${ProjectPath}/config/[small|median|big|small_old]"
      echo "       - export CUDA_VISIBLE_DEVICES=2; bash run.sh small train small_1.yml"
      echo "       - bash run.sh small train small_1.yml"
 }
@@ -23,9 +28,6 @@ if [ "$#" -ne 3 ] ; then
 fi
 
 ########################### Project Parameters #######################
-dataset=$1
-target=$2
-configFile=$3
 
 prefix="${dataset}-$target-$(echo "${configFile}" | cut -d'.' -f1)"
 
