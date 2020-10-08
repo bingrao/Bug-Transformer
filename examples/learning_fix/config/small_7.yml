@@ -34,7 +34,7 @@ train:
   word_vec_size: 512
   rnn_size: 512
   layers: 6
-  transformer_ff: 2048
+  transformer_ff: 512
   heads: 8
 
   accum_count: 8
@@ -45,7 +45,7 @@ train:
   learning_rate: 0.01
   max_grad_norm: 5
 
-  batch_size: 2048
+  batch_size: 4096
   batch_type: tokens
   normalization: tokens
   dropout: 0.2
@@ -58,11 +58,10 @@ train:
   position_encoding: 'true'
 
   master_port: 8001
-  world_size: 3
+  world_size: 2
   gpu_ranks:
     - 0
     - 1
-    - 2
 
 translate:
   work_model: translate
