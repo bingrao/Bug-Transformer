@@ -1,0 +1,1 @@
+private void METHOD_1 ( ) { ( Ident_1 ) -- ; if ( ( Ident_1 ) <= 0 ) { Ident_1 = 0 ; METHOD_2 ( STRING_1 , false ) ; } else { METHOD_2 ( Ident_2 . get ( ( ( Ident_2 . size ( ) ) - ( Ident_1 ) ) ) , true ) ; } }
