@@ -230,10 +230,10 @@ class SequencRData(object):
         valid_fixed = fixed_abstract_list[nums_train:][nums_test:]
 
 
-        with open(join(self.opt.output, "valid-buggy.txt"), 'w') as output:
+        with open(join(self.opt.output, "eval-buggy.txt"), 'w') as output:
             output.writelines("%s\n" % place for place in valid_buggy)
 
-        with open(join(self.opt.output, "valid-fixed.txt"), 'w') as output:
+        with open(join(self.opt.output, "eval-fixed.txt"), 'w') as output:
             output.writelines("%s\n" % place for place in valid_fixed)
         logging.info(f"Generate valid file: {len(valid_buggy)}, {len(valid_fixed)}")
 
