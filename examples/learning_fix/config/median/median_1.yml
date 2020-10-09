@@ -22,7 +22,7 @@ train:
   save_checkpoint_steps: 1000
   keep_checkpoint: 30
   seed: 3435
-  train_steps: 100000
+  train_steps: 25000
   valid_steps: 5000
   early_stopping: 10
   warmup_steps: 4000
@@ -42,7 +42,7 @@ train:
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
-  learning_rate: 0.1
+  learning_rate: 0.01
   max_grad_norm: 5
 
   batch_size: 4096
@@ -67,12 +67,11 @@ train:
 
 translate:
   work_model: translate
-#  model: examples/learning_fix/data/median/1/median-step-31000-acc-98.43-ppl-1.05-xent-0.05.pt
   src: examples/learning_fix/data/median/test-buggy.txt
   tgt: examples/learning_fix/data/median/test-fixed.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
-  max_length: 100
+  max_length: 150
   batch_size: 4096
 #  report_align: 'true'

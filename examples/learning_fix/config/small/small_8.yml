@@ -22,7 +22,7 @@ train:
   save_checkpoint_steps: 1000
   keep_checkpoint: 30
   seed: 3435
-  train_steps: 100000
+  train_steps: 25000
   valid_steps: 5000
   early_stopping: 10
   warmup_steps: 4000
@@ -65,7 +65,6 @@ train:
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/small/10/small-step-79000-acc-95.28-ppl-1.18-xent-0.17.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
   data_type: "code"
