@@ -62,23 +62,6 @@ else
     exit 1
 fi
 
-function parse_and_print_yaml {
-   local prefix=$2
-   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
-   sed -ne "s|^\($s\):|\1|" \
-        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
-        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   awk -F"$fs" '{
-      indent = length($1)/2;
-      vname[indent] = $2;
-      for (i in vname) {if (i > indent) {delete vname[i]}}
-      if (length($3) > 0) {
-         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
-      }
-   }'
-}
-
 function parse_yaml() {
    local config_file=$1
    local target=$2
@@ -101,15 +84,47 @@ function parse_yaml() {
    echo "${reg}"
 }
 
+function parse_one_layer_yaml() {
+   local config_file=$1
+   local target=$2
+   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   local reg=$(sed -ne "s|^\($s\):|\1|" \
+          -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+          -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  "$config_file" |
+           awk -F$fs '{
+              indent = length($1)/2;
+              vname[indent] = $2;
+              for (i in vname) {if (i > indent) {delete vname[i]}}
+              if (length($2) > 0) {
+                 vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])}
+                 if (vn == "'$target'"){
+                   print($2);
+                 }
+              }
+           }')
+   echo "${reg}"
+}
+
 function _abstract() {
   logInfo "------------------- Code Abstract ------------------------"
 
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M -Dlog4j.configuration=file:///${ConfigPath}/log4j.properties"
-  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar "abstract" "${ConfigFile}" | tee -a "${LogFile}"
+  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar -config "${ConfigFile}" | tee -a "${LogFile}"
+#  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar -run_type "abstract" \
+#        -buggy_path "examples/learning_fix/data/${dataset}/raw/buggy/" \
+#        -fixed_path "examples/learning_fix/data/${dataset}/raw/fixed/" \
+#        -output_dir "examples/learning_fix/data/${dataset}/" \
+#        -idioms_path "examples/learning_fix/data/idioms/idioms.csv" \
+#        -nums_worker 10 \
+#        -with_position false \
+#        -output_position false | tee -a "${LogFile}"
 
   logInfo "Generated abstract code is done, then split into train, test, eval dataset ..."
-  OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
-  OutputFixedDir=$(cat "${ConfigFile}" | grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+#  OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+#  OutputFixedDir=$(cat "${ConfigFile}" | grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
+
+  OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "output_dir" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
+  OutputFixedDir=$(cat "${ConfigFile}" | grep -e "output_dir" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
 
   OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
   OutputFixedFile=${OutputFixedDir}/total/fixed.txt
