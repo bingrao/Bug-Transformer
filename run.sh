@@ -307,8 +307,8 @@ function _inference() {
   TranslateBestRatio=1.0
 
   logInfo "------------------- Inference Search ------------------------"
-#  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
-  beam_widths=("1" "5" "10" "15" "20")
+  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
+#  beam_widths=("1" "5" "10" "15" "20")
   for beam_width in ${beam_widths[*]}
   do
     _translate "${beam_width}" "${beam_width}" "${TranslateBestRatio}"
@@ -336,10 +336,10 @@ case ${target} in
    "translate")
       # The beam size for prediction
       TranslateBeamSize=$(parse_yaml "${ConfigFile}" "translate" "beam_size")
-      [ -z "${TranslateBeamSize}" ] &&  TranslateBeamSize=1
+      [ -z "${TranslateBeamSize}" ] &&  TranslateBeamSize=50
 
       TranslateNBest=$(parse_yaml "${ConfigFile}" "translate" "n_best")
-      [ -z "${TranslateNBest}" ] && TranslateNBest=1
+      [ -z "${TranslateNBest}" ] && TranslateNBest=50
 
       TranslateBestRatio=1.0
       _translate ${TranslateBeamSize} "${TranslateNBest}" "${TranslateBestRatio}"
