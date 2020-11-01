@@ -460,8 +460,8 @@ case ${target} in
       n_bests=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
       for n_best in ${n_bests[*]}
       do
-#        _performance "${n_best}" "bleu"
-#        _performance "${n_best}" "similarity"
+        _performance "${n_best}" "bleu"
+        _performance "${n_best}" "similarity"
         _performance "${n_best}" "ast"
       done
     ;;
