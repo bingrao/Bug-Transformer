@@ -14,7 +14,7 @@ DataPath=${ProjectPath}/data; [ -d "$DataPath" ] || mkdir -p "$DataPath"
 CurrentDate=$(date +%F)
 
 function help() {
-     echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset[small|median|big|small_old] target[abstract|preprocess|train|translate|all|inference|performancess] configFile" >&2
+     echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset[small|median|big|small_old] target[abstract|preprocess|train|translate|all|inference|performance] configFile" >&2
      echo "Example: Using third (or first by default) GPU to train small dataset with small_1.yml config file"
      echo "Example: The default direcotry that system searches config files: ${ProjectPath}/config/[small|median|big|small_old]"
      echo "       - export CUDA_VISIBLE_DEVICES=2; bash run.sh small train small_1.yml"
@@ -357,7 +357,7 @@ function _performance() {
         -fixed_path "${TranslateTarget}" \
         -predt_path "${PREDT_PATH}" \
         -n_best "${n_best}" \
-        -nums_worker "${nums_worker}" \
+        -nums_worker 32 \
         -measure="${measure}" \
         -output_dir "${OUTPUT_DIR}" | tee -a "${LogFile}"
     ;;
@@ -460,8 +460,8 @@ case ${target} in
       n_bests=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
       for n_best in ${n_bests[*]}
       do
-        _performance "${n_best}" "bleu"
-        _performance "${n_best}" "similarity"
+#        _performance "${n_best}" "bleu"
+#        _performance "${n_best}" "similarity"
         _performance "${n_best}" "ast"
       done
     ;;
