@@ -3,7 +3,7 @@
 dataset="small"
 config_index=10
 step=100000
-nums_worker=64
+nums_worker=32
 
 ############################# Root envs ############################
 RootPath=$(pwd)
@@ -14,13 +14,11 @@ BinPath=${ProjectPath}/bin; [ -d "$BinPath" ] || mkdir -p "$BinPath"
 LogPath=${ProjectPath}/logs; [ -d "$LogPath" ] || mkdir -p "$LogPath"
 DataPath=${ProjectPath}/data; [ -d "$DataPath" ] || mkdir -p "$DataPath"
 CurrentDate=$(date +%F)
-prefix="performance-analysis"
+prefix="${dataset}-performance-${dataset}_${config_index}"
 LogFile=${LogPath}/${CurrentDate}-${prefix}.log
 
 FIXED_PATH=${ProjectPath}/data/${dataset}/test-fixed.txt
 BUGGY_PATH=${ProjectPath}/data/${dataset}/test-buggy.txt
-
-
 
 function logInfo() {
     echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
@@ -83,6 +81,7 @@ function _performance() {
   PREDT_BEST_OUTPUT=${OUTPUT_DIR}/${n_best}_${measure}_predt_best.txt
   FIXED_BEST_OUTPUT=${OUTPUT_DIR}/${n_best}_${measure}_fixed_best.txt
   BUGGY_BEST_OUTPUT=${OUTPUT_DIR}/${n_best}_${measure}_buggy_best.txt
+
   if [ -f "${PREDT_BEST_OUTPUT}" -a -f "${FIXED_BEST_OUTPUT}" -a -f "${BUGGY_BEST_OUTPUT}" ]
   then
     err_cnt=("0" "1" "2" "3" "4" "Er")
@@ -111,9 +110,7 @@ function _performance() {
 n_bests=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
 for n_best in ${n_bests[*]}
 do
-#  _performance "${n_best}" "bleu"
-#  _performance "${n_best}" "similarity"
- _performance "${n_best}" "ast"
+  _performance "${n_best}" "bleu"
+  _performance "${n_best}" "similarity"
+  _performance "${n_best}" "ast"
 done
-#
-# _performance 1 "ast"

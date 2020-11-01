@@ -74,6 +74,7 @@ translate:
   data_type: "code"
   share_vocab: True
   min_length: 0
-  max_length: 100
-  batch_size: 1024
+  max_length: 200
+  batch_size: 32
+  gpu: 0
 #  report_align: 'true'

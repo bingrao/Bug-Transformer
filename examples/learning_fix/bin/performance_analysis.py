@@ -380,12 +380,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logging = get_logger(save_log=args.project_log, isDebug=args.debug)
+
+    for arg in vars(args):
+        logging.debug(f"{arg} -> {getattr(args, arg)}")
+
     predictor = PredictionSplit(args, logging)
 
     # Debug code
     # predictor.debug_accuarcy()
 
-    result = predictor.run()
+
+    predictor.run()
 
     # predictor.retrieve_java_code(args.src_buggy)
 

@@ -70,5 +70,6 @@ translate:
   share_vocab: True
   min_length: 0
   max_length: 150
-  batch_size: 4096
+  batch_size: 32
+  gpu: 0
 #  report_align: 'true'

@@ -14,7 +14,7 @@ DataPath=${ProjectPath}/data; [ -d "$DataPath" ] || mkdir -p "$DataPath"
 CurrentDate=$(date +%F)
 
 function help() {
-     echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset[small|median|big|small_old] target[abstract|preprocess|train|translate|all|inference] configFile" >&2
+     echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset[small|median|big|small_old] target[abstract|preprocess|train|translate|all|inference|performancess] configFile" >&2
      echo "Example: Using third (or first by default) GPU to train small dataset with small_1.yml config file"
      echo "Example: The default direcotry that system searches config files: ${ProjectPath}/config/[small|median|big|small_old]"
      echo "       - export CUDA_VISIBLE_DEVICES=2; bash run.sh small train small_1.yml"
@@ -308,12 +308,105 @@ function _inference() {
 
   logInfo "------------------- Inference Search ------------------------"
   beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
-#  beam_widths=("1" "5" "10" "15" "20")
+#  beam_widths=("35" "40" "45" "50")
   for beam_width in ${beam_widths[*]}
   do
     _translate "${beam_width}" "${beam_width}" "${TranslateBestRatio}"
     printf "\n\n" | tee -a "${LogFile}"
   done
+}
+
+
+function _performance() {
+
+  n_best=$1
+  measure=$2
+
+  ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
+  step=$(echo "${ModelCheckpoint}" | awk -F'/' '{print $NF}' | cut -d'-' -f 3)
+
+  logInfo "-------------------- Performance Analysis for dataset[${dataset}], config[${config_index}], train step[${step}] --------------------"
+  OUTPUT_DIR=${ProjectPath}/data/${dataset}/${config_index}/${step}/${measure}/; [ -d "$OUTPUT_DIR" ] || mkdir -p "$OUTPUT_DIR"
+  PREDT_PATH=${ProjectPath}/data/${dataset}/${config_index}/${step}/predictions_${n_best}_${n_best}.txt
+
+  # The buggy code (source) to translate task
+  TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
+
+  # The fixed code (target) to translate task
+  TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
+
+  case ${measure} in
+    "similarity")
+      # shellcheck disable=SC2091
+      python "${BinPath}"/performance_analysis.py \
+        -output="${OUTPUT_DIR}" \
+        -src_buggy="${TranslateSource}" \
+        -src_fixed="${TranslateTarget}" \
+        -pred_fixed="${PREDT_PATH}" \
+        -project_log="${LogFile}" \
+        -n_best="${n_best}" \
+        -log4j_config="${ConfigPath}"/log4j.properties \
+        -jar="${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar \
+        -measure="${measure}" | tee -a "${LogFile}"
+    ;;
+
+    "ast")
+      export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M -Dlog4j.configuration=file:///${ConfigPath}/log4j.properties"
+      scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar -run_type "astdiff" \
+        -buggy_path "${TranslateSource}" \
+        -fixed_path "${TranslateTarget}" \
+        -predt_path "${PREDT_PATH}" \
+        -n_best "${n_best}" \
+        -nums_worker "${nums_worker}" \
+        -measure="${measure}" \
+        -output_dir "${OUTPUT_DIR}" | tee -a "${LogFile}"
+    ;;
+
+    "bleu")
+      # shellcheck disable=SC2091
+      python "${BinPath}"/performance_analysis.py \
+        -output="${OUTPUT_DIR}" \
+        -src_buggy="${TranslateSource}" \
+        -src_fixed="${TranslateTarget}" \
+        -pred_fixed="${PREDT_PATH}" \
+        -project_log="${LogFile}" \
+        -n_best="${n_best}" \
+        -log4j_config="${ConfigPath}"/log4j.properties \
+        -jar="${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar \
+        -measure="${measure}" | tee -a "${LogFile}"
+    ;;
+
+    *)
+      logInfo "There is no match case for ${measure}"
+      exit 1
+  esac
+
+  PREDT_BEST_OUTPUT=${OUTPUT_DIR}/${n_best}_${measure}_predt_best.txt
+  FIXED_BEST_OUTPUT=${OUTPUT_DIR}/${n_best}_${measure}_fixed_best.txt
+  BUGGY_BEST_OUTPUT=${OUTPUT_DIR}/${n_best}_${measure}_buggy_best.txt
+
+  if [ -f "${PREDT_BEST_OUTPUT}" -a -f "${FIXED_BEST_OUTPUT}" -a -f "${BUGGY_BEST_OUTPUT}" ]
+  then
+    err_cnt=("0" "1" "2" "3" "4" "Er")
+    ERROR_OUTPUT_DIR=${OUTPUT_DIR}/${n_best}/; [ -d "$ERROR_OUTPUT_DIR" ] || mkdir -p "$ERROR_OUTPUT_DIR"
+    for cnt in ${err_cnt[*]}
+    do
+      cat < "${PREDT_BEST_OUTPUT}" | grep -e "#[0-9]*#${cnt}#" > "${ERROR_OUTPUT_DIR}"/"${cnt}"_predt.txt
+      cat < "${FIXED_BEST_OUTPUT}" | grep -e "#[0-9]*#${cnt}#" > "${ERROR_OUTPUT_DIR}"/"${cnt}"_fixed.txt
+      cat < "${BUGGY_BEST_OUTPUT}" | grep -e "#[0-9]*#${cnt}#" > "${ERROR_OUTPUT_DIR}"/"${cnt}"_buggy.txt
+    done
+
+    logInfo "[BLEU] buggy vs fixed"
+    "${BinPath}"/multi-bleu.perl "${FIXED_BEST_OUTPUT}" < "${BUGGY_BEST_OUTPUT}" | tee -a "${LogFile}"
+
+    logInfo "[BLUE] predt vs fixed"
+    "${BinPath}"/multi-bleu.perl "${FIXED_BEST_OUTPUT}" < "${PREDT_BEST_OUTPUT}" | tee -a "${LogFile}"
+
+  else
+    [  -f "${PREDT_BEST_OUTPUT}" ] || logInfo "The input ${PREDT_BEST_OUTPUT} does not exist ..."
+    [  -f "${FIXED_BEST_OUTPUT}" ] || logInfo "The input ${FIXED_BEST_OUTPUT} does not exist ..."
+    [  -f "${BUGGY_BEST_OUTPUT}" ] || logInfo "The input ${BUGGY_BEST_OUTPUT} does not exist ..."
+  fi
 }
 
 ##################################################################################################
@@ -362,6 +455,16 @@ case ${target} in
    "inference")
       _inference
    ;;
+
+   "performance")
+      n_bests=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
+      for n_best in ${n_bests[*]}
+      do
+        _performance "${n_best}" "bleu"
+        _performance "${n_best}" "similarity"
+        _performance "${n_best}" "ast"
+      done
+    ;;
 
    *)
      logInfo "There is no match case for ${target}"
