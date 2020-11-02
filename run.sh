@@ -325,7 +325,7 @@ function _performance() {
   ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
   step=$(echo "${ModelCheckpoint}" | awk -F'/' '{print $NF}' | cut -d'-' -f 3)
 
-  logInfo "-------------------- Performance Analysis for dataset[${dataset}], config[${config_index}], train step[${step}] --------------------"
+  logInfo "Performance Analysis for dataset[${dataset}], config[${config_index}], train step[${step}] n_best[${n_best}}] measure[${measure}}] \t--------------------"
   OUTPUT_DIR=${ProjectPath}/data/${dataset}/${config_index}/${step}/${measure}/; [ -d "$OUTPUT_DIR" ] || mkdir -p "$OUTPUT_DIR"
   PREDT_PATH=${ProjectPath}/data/${dataset}/${config_index}/${step}/predictions_${n_best}_${n_best}.txt
 
@@ -357,7 +357,7 @@ function _performance() {
         -fixed_path "${TranslateTarget}" \
         -predt_path "${PREDT_PATH}" \
         -n_best "${n_best}" \
-        -nums_worker 32 \
+        -nums_worker 64 \
         -measure="${measure}" \
         -output_dir "${OUTPUT_DIR}" | tee -a "${LogFile}"
     ;;
@@ -377,7 +377,7 @@ function _performance() {
     ;;
 
     *)
-      logInfo "There is no match case for ${measure}"
+      logInfo "There is no match measure case for ${measure}"
       exit 1
   esac
 
@@ -396,11 +396,11 @@ function _performance() {
       cat < "${BUGGY_BEST_OUTPUT}" | grep -e "#[0-9]*#${cnt}#" > "${ERROR_OUTPUT_DIR}"/"${cnt}"_buggy.txt
     done
 
-    logInfo "[BLEU] buggy vs fixed"
-    "${BinPath}"/multi-bleu.perl "${FIXED_BEST_OUTPUT}" < "${BUGGY_BEST_OUTPUT}" | tee -a "${LogFile}"
+    logInfo "[BLEU] buggy vs fixed: $("${BinPath}"/multi-bleu.perl "${FIXED_BEST_OUTPUT}" < "${BUGGY_BEST_OUTPUT}")"
+#    "${BinPath}"/multi-bleu.perl "${FIXED_BEST_OUTPUT}" < "${BUGGY_BEST_OUTPUT}" | tee -a "${LogFile}"
 
-    logInfo "[BLUE] predt vs fixed"
-    "${BinPath}"/multi-bleu.perl "${FIXED_BEST_OUTPUT}" < "${PREDT_BEST_OUTPUT}" | tee -a "${LogFile}"
+    logInfo "[BLUE] predt vs fixed: $("${BinPath}"/multi-bleu.perl "${FIXED_BEST_OUTPUT}" < "${PREDT_BEST_OUTPUT}")"
+#    "${BinPath}"/multi-bleu.perl "${FIXED_BEST_OUTPUT}" < "${PREDT_BEST_OUTPUT}" | tee -a "${LogFile}"
 
   else
     [  -f "${PREDT_BEST_OUTPUT}" ] || logInfo "The input ${PREDT_BEST_OUTPUT} does not exist ..."
@@ -458,11 +458,13 @@ case ${target} in
 
    "performance")
       n_bests=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
+#      n_bests=("30" "35" "40" "45" "50")
       for n_best in ${n_bests[*]}
       do
-        _performance "${n_best}" "bleu"
         _performance "${n_best}" "similarity"
-        _performance "${n_best}" "ast"
+        _performance "${n_best}" "bleu"
+#        _performance "${n_best}" "ast"
+        printf "\n\n" | tee -a "${LogFile}"
       done
     ;;
 
