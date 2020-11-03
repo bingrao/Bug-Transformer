@@ -5,8 +5,8 @@ preprocess:
   valid_src: examples/learning_fix/data/big/eval-buggy.txt
   valid_tgt: examples/learning_fix/data/big/eval-fixed.txt
   save_data: examples/learning_fix/data/big/big
-  src_seq_length: 10280
-  tgt_seq_length: 10280
+  src_seq_length: 10327
+  tgt_seq_length: 10327
   src_seq_length_trunc: 400
   tgt_seq_length_trunc: 200
   num_threads: 10
@@ -18,8 +18,8 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/big/big
-  save_checkpoint_steps: 1000
-  keep_checkpoint: 30
+  save_checkpoint_steps: 2000
+  keep_checkpoint: 100
   seed: 3435
   train_steps: 100000
   valid_steps: 5000
@@ -56,12 +56,10 @@ train:
   position_encoding: 'true'
 
   master_port: 8003
-  world_size: 4
+  world_size: 2
   gpu_ranks:
     - 0
     - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate
