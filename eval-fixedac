@@ -1,1 +1,1 @@
-private void METHOD_1 ( ) { ( Ident_1 ) -- ; if ( ( Ident_1 ) <= 0 ) { Ident_1 = 0 ; METHOD_2 ( STRING_1 , false ) ; } else { if ( ! ( Ident_2 . isEmpty ( ) ) ) { METHOD_2 ( Ident_2 . get ( ( ( Ident_2 . size ( ) ) - ( Ident_1 ) ) ) , true ) ; } } }
+private void METHOD1 ( ) { ( Ident1 ) -- ; if ( ( Ident1 ) <= 0 ) { Ident1 = 0 ; METHOD2 ( STRING1 , false ) ; } else { if ( ! ( Ident2 . isEmpty ( ) ) ) { METHOD2 ( Ident2 . get ( ( ( Ident2 . size ( ) ) - ( Ident1 ) ) ) , true ) ; } } }
