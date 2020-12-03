@@ -5,25 +5,26 @@ preprocess:
   valid_src: examples/learning_fix/data/median/eval-buggy.txt
   valid_tgt: examples/learning_fix/data/median/eval-fixed.txt
   save_data: examples/learning_fix/data/median/median
-  src_seq_length: 65455
-  tgt_seq_length: 65455
-  src_seq_length_trunc: 400
-  tgt_seq_length_trunc: 200
+  src_seq_length: 52364
+  tgt_seq_length: 52364
+  src_seq_length_trunc: 512
+  tgt_seq_length_trunc: 512
   num_threads: 10
   overwrite: True
   share_vocab: True
-  pos_vec_size: 256
+  pos_vec_size: 512
   data_type: "code"
 
 train:
   work_model: train
   data: examples/learning_fix/data/median/median
-  save_checkpoint_steps: 5000
-  keep_checkpoint: 100
+  save_checkpoint_steps: 1000
+  keep_checkpoint: 30
   seed: 3435
-  train_steps: 100000
+
+  train_steps: 10000
   valid_steps: 5000
-  early_stopping: 3
+  early_stopping: 10
   warmup_steps: 4000
   report_every: 1000
 
@@ -33,7 +34,7 @@ train:
   word_vec_size: 512
   rnn_size: 512
   layers: 6
-  transformer_ff: 2048
+  transformer_ff: 4096
   heads: 8
 
   accum_count: 8
@@ -48,7 +49,7 @@ train:
   batch_type: tokens
   normalization: tokens
   dropout: 0.2
-  label_smoothing: 0.1
+  label_smoothing: 0.2
 
   max_generator_batches: 2
 
@@ -56,23 +57,20 @@ train:
   param_init_glorot: 'true'
   position_encoding: 'true'
 
-  master_port: 8002
-  world_size: 4
+  master_port: 11111
+  world_size: 2
   gpu_ranks:
     - 0
     - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/median/1/median-step-80000-acc-96.36-ppl-1.16-xent-0.15.pt
+  model: examples/learning_fix/data/median/2/median-step-55000-acc-94.94-ppl-1.21-xent-0.19.pt
   src: examples/learning_fix/data/median/test-buggy.txt
   tgt: examples/learning_fix/data/median/test-fixed.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
   max_length: 150
-  batch_size: 32
-  gpu: 0
+  batch_size: 4096
 #  report_align: 'true'

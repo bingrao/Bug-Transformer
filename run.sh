@@ -109,8 +109,8 @@ function _abstract() {
   logInfo "------------------- Code Abstract ------------------------"
 
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M -Dlog4j.configuration=file:///${ConfigPath}/log4j.properties"
-  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar -config "${ConfigFile}" | tee -a "${LogFile}"
-#  scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar -run_type "abstract" \
+  scala "${BinPath}"/code2abs-1.0-jar-with-dependencies.jar -config "${ConfigFile}" | tee -a "${LogFile}"
+#  scala "${BinPath}"/code2abs-1.0-jar-with-dependencies.jar -run_type "abstract" \
 #        -buggy_path "examples/learning_fix/data/${dataset}/raw/buggy/" \
 #        -fixed_path "examples/learning_fix/data/${dataset}/raw/fixed/" \
 #        -output_dir "examples/learning_fix/data/${dataset}/" \
@@ -118,6 +118,7 @@ function _abstract() {
 #        -nums_worker 10 \
 #        -with_position false \
 #        -output_position false | tee -a "${LogFile}"
+
 
   logInfo "Generated abstract code is done, then split into train, test, eval dataset ..."
 #  OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
@@ -263,7 +264,7 @@ function _translate() {
       -n_best="${n_best}" \
       -best_ratio="${TranslateBestRatio}" \
       -log4j_config="${ConfigPath}"/log4j.properties \
-      -jar="${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar \
+      -jar="${BinPath}"/code2abs-1.0-jar-with-dependencies.jar \
       -nums_thread=${nums_thread} \
       -measure=${measure} 2>&1)
 
@@ -307,8 +308,8 @@ function _inference() {
   TranslateBestRatio=1.0
 
   logInfo "------------------- Inference Search ------------------------"
-  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
-#  beam_widths=("35" "40" "45" "50")
+#  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
+  beam_widths=("45" "50")
   for beam_width in ${beam_widths[*]}
   do
     _translate "${beam_width}" "${beam_width}" "${TranslateBestRatio}"
@@ -346,13 +347,13 @@ function _performance() {
         -project_log="${LogFile}" \
         -n_best="${n_best}" \
         -log4j_config="${ConfigPath}"/log4j.properties \
-        -jar="${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar \
+        -jar="${BinPath}"/code2abs-1.0-jar-with-dependencies.jar \
         -measure="${measure}" | tee -a "${LogFile}"
     ;;
 
     "ast")
       export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M -Dlog4j.configuration=file:///${ConfigPath}/log4j.properties"
-      scala "${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar -run_type "astdiff" \
+      scala "${BinPath}"/code2abs-1.0-jar-with-dependencies.jar -run_type "astdiff" \
         -buggy_path "${TranslateSource}" \
         -fixed_path "${TranslateTarget}" \
         -predt_path "${PREDT_PATH}" \
@@ -372,7 +373,7 @@ function _performance() {
         -project_log="${LogFile}" \
         -n_best="${n_best}" \
         -log4j_config="${ConfigPath}"/log4j.properties \
-        -jar="${BinPath}"/java_abstract-1.0-jar-with-dependencies.jar \
+        -jar="${BinPath}"/code2abs-1.0-jar-with-dependencies.jar \
         -measure="${measure}" | tee -a "${LogFile}"
     ;;
 

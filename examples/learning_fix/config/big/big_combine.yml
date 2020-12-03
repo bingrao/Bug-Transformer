@@ -1,0 +1,4 @@
+"run_type": "combine"
+"buggy_path": "examples/learning_fix/data/big/raw/buggy/"
+"fixed_path": "examples/learning_fix/data/big/raw/fixed/"
+"output_dir": "examples/learning_fix/data/big/raw/"

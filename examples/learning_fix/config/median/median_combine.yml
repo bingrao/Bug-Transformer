@@ -1,0 +1,4 @@
+"run_type": "combine"
+"buggy_path": "examples/learning_fix/data/median/raw/buggy/"
+"fixed_path": "examples/learning_fix/data/median/raw/fixed/"
+"output_dir": "examples/learning_fix/data/median/raw/"

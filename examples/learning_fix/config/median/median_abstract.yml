@@ -1,0 +1,12 @@
+"run_type": "abstract"
+"buggy_path": "examples/learning_fix/data/median/raw/buggy_src.txt"
+"fixed_path": "examples/learning_fix/data/median/raw/fixed_src.txt"
+"output_dir": "examples/learning_fix/data/median/"
+"idioms_path": "examples/learning_fix/data/idioms/idioms.csv"
+"nums_worker": 10
+"with_position": false
+"output_position": false
+"append_vocab": false
+"is_abstract": false
+"top_k": 600
+"is_separated": false
