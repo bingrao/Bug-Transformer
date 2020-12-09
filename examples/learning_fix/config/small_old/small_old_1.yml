@@ -18,10 +18,11 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small_old/small_old
-  save_checkpoint_steps: 1000
-  keep_checkpoint: 30
+  train_from: examples/learning_fix/data/small_old/1/small_old-step-100000-acc-94.93-ppl-1.19-xent-0.18.pt
+  save_checkpoint_steps: 2000
+  keep_checkpoint: 1000
   seed: 3435
-  train_steps: 100000
+  train_steps: 300000
   valid_steps: 5000
   early_stopping: 10
   warmup_steps: 4000
@@ -56,7 +57,7 @@ train:
   param_init_glorot: 'true'
   position_encoding: 'true'
 
-  master_port: 8001
+  master_port: 8002
   world_size: 2
   gpu_ranks:
     - 0
@@ -71,7 +72,7 @@ translate:
   data_type: "code"
   share_vocab: True
   min_length: 0
-  max_length: 80
-  batch_size: 32
+  max_length: 100
+  batch_size: 16
   gpu: 0
 #  report_align: 'true'

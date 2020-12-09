@@ -5,8 +5,8 @@ preprocess:
   valid_src: examples/learning_fix/data/small/eval-buggy.txt
   valid_tgt: examples/learning_fix/data/small/eval-fixed.txt
   save_data: examples/learning_fix/data/small/small
-  src_seq_length: 46679
-  tgt_seq_length: 46679
+  src_seq_length: 46680
+  tgt_seq_length: 46680
   src_seq_length_trunc: 400
   tgt_seq_length_trunc: 200
   num_threads: 10
@@ -18,21 +18,23 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  save_model: examples/learning_fix/data/small/1/small
-  save_checkpoint_steps: 5000
-  keep_checkpoint: 10
+  train_from: examples/learning_fix/data/small/1/small-step-100000-acc-95.04-ppl-1.19-xent-0.18.pt
+  save_checkpoint_steps: 2000
+  keep_checkpoint: 1000
   seed: 3435
-  train_steps: 100000
-  valid_steps: 10000
+  train_steps: 300000
+  valid_steps: 5000
+  early_stopping: 10
   warmup_steps: 4000
   report_every: 1000
 
+
   decoder_type: transformer
   encoder_type: transformer
-  word_vec_size: 128
-  rnn_size: 128
+  word_vec_size: 512
+  rnn_size: 512
   layers: 6
-  transformer_ff: 512
+  transformer_ff: 2048
   heads: 8
 
   accum_count: 8
@@ -40,13 +42,13 @@ train:
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
-  learning_rate: 0.001
-  max_grad_norm: 0.0
+  learning_rate: 0.01
+  max_grad_norm: 5
 
-  batch_size: 1024
+  batch_size: 4096
   batch_type: tokens
   normalization: tokens
-  dropout: 0.1
+  dropout: 0.2
   label_smoothing: 0.1
 
   max_generator_batches: 2
@@ -56,22 +58,20 @@ train:
   position_encoding: 'true'
 
   master_port: 8001
-  world_size: 4
+  world_size: 2
   gpu_ranks:
     - 0
     - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate
-#  model: examples/learning_fix/data/small/1/small_step_50000.pt
+#  model: examples/learning_fix/data/small/10/small-step-132000-acc-95.46-ppl-1.17-xent-0.16.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
-  output: examples/learning_fix/data/small/1/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
   max_length: 100
-  batch_size: 1024
+  batch_size: 16
+  gpu: 0
 #  report_align: 'true'
