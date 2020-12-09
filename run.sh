@@ -304,6 +304,118 @@ function _translate() {
 
 }
 
+
+function loop_translate() {
+
+  beam_size=$1
+  n_best=$2
+  TranslateBestRatio=$3
+  ModelCheckpoint=$4
+  enableTranslate=true  # Available options: true, false
+  measure='similarity'  # The measure using in classification task, available options: 'similarity', 'ast', 'bleu'
+  nums_thread=32  # Nums of thread to conduct classification tasks
+  logInfo "------------------- Translate  ------------------------"
+  ######### Internal Special parameters for model translate ###################
+  SECONDS=0
+
+  # The buggy code (source) to translate task
+  TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
+
+  # The fixed code (target) to translate task
+  TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
+
+  # The model predict output, each line is corresponding to the line in buggy code
+  TranslateOutput=$(parse_yaml "${ConfigFile}" "translate" "output")
+  [ -z "${TranslateOutput}" ] && TranslateOutput=${DataOutputPath}/predictions.txt || TranslateOutput=${RootPath}/${TranslateOutput}
+
+
+  ModelCheckpointPrefix="$(parse_yaml "${ConfigFile}" "train" "save_model")"
+  [ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset} || ModelCheckpointPrefix=${RootPath}/${ModelCheckpointPrefix}
+
+  logInfo "Beam Size ${beam_size}, nums of best ${n_best}"
+
+#  # Test if checkpoint is set up in the config file
+#  if [ -z "$(parse_yaml "${ConfigFile}" "translate" "model")" ]
+#  then
+#      logInfo "The Checkpoint model is not be set up in ${ConfigFile}, then search best one."
+#
+#      # NF means the number of parameters in awk command
+#      # shellcheck disable=SC2012
+#      ModelCheckpoint=$(ls "${ModelCheckpointPrefix}"-step-*.pt |
+#          awk -F '-' 'BEGIN{maxv=-1000000} {score=$(NF-4); if (score > maxv) {maxv=score; max=$0}}  END{ print max}')
+#  else
+#      ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
+#  fi
+
+
+  step=$(echo "${ModelCheckpoint}" | awk -F'/' '{print $NF}' | cut -d'-' -f 3)
+  DataOutputStepPath=${DataOutputPath}/${step}; [ -d "$DataOutputStepPath" ] || mkdir -p "$DataOutputStepPath"
+  PredBackupPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}".txt
+  PredBestPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}"_best.txt
+
+  if [ "${enableTranslate}" = true ]; then
+    logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
+    logInfo "The output prediction will be save to ${TranslateOutput}"
+    onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -n_best "${n_best}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
+
+    # Backup all predictions txt
+    logInfo "Backup the model output to ${PredBackupPath}"
+    mv "${TranslateOutput}" "${PredBackupPath}"
+  fi
+
+  logInfo "------------------- Classification ------------------------"
+  total=$(awk 'END{print NR}' "${TranslateTarget}" | awk '{print $1}')
+  logInfo "Get best prediction results using n_best [${n_best}], best_ratio [${TranslateBestRatio}], measure [${measure}], nums_thread [${nums_thread}]"
+
+  output=$(python "${BinPath}"/split_predictions.py \
+      -output="${PredBestPath}" \
+      -src_buggy="${TranslateSource}" \
+      -src_fixed="${TranslateTarget}" \
+      -pred_fixed="${PredBackupPath}" \
+      -project_log="${LogFile}" \
+      -n_best="${n_best}" \
+      -best_ratio="${TranslateBestRatio}" \
+      -log4j_config="${ConfigPath}"/log4j.properties \
+      -jar="${BinPath}"/code2abs-1.0-jar-with-dependencies.jar \
+      -nums_thread=${nums_thread} \
+      -measure=${measure} 2>&1)
+
+  perf=$(awk '{print $1}' <<< "$output")
+  changed=$(awk '{print $2}' <<< "$output")
+  bad=$(awk '{print $3}' <<< "$output")
+  perf_perc="$(echo "scale=2; $perf * 100 / $total" | bc)"
+
+  logInfo "Perf  : $perf ($perf_perc%)"
+  logInfo "Pot   : $changed"
+  logInfo "Bad   : $bad"
+  logInfo "--------------------"
+  logInfo "Total : $total"
+
+
+  logInfo "------------------- Bleu ------------------------"
+  logInfo "buggy vs fixed"
+  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${TranslateSource}" | tee -a "${LogFile}"
+
+  logInfo "prediction vs fixed"
+  "${BinPath}"/multi-bleu.perl "${TranslateTarget}" < "${PredBestPath}" | tee -a "${LogFile}"
+
+
+  elapsed=$SECONDS
+  logInfo "---------- Time report ----------"
+	logInfo "Total seconds: $elapsed"
+
+  total=$(awk 'END{print NR}' "${TranslateSource}" | awk '{print $1}')
+  patches=$((total * beam_size))
+  avg="$(echo "scale=6; $elapsed / $patches" | bc)"
+  avg_bug="$(echo "scale=6; $elapsed / $total" | bc)"
+
+  logInfo "Total bugs: $total"
+  logInfo "Total patches: $patches"
+  logInfo "Avg patch/sec: $avg"
+  logInfo "Avg bug/sec: $avg_bug"
+
+}
+
 function _inference() {
   TranslateBestRatio=1.0
 
@@ -438,6 +550,23 @@ case ${target} in
       TranslateBestRatio=1.0
       _translate ${TranslateBeamSize} "${TranslateNBest}" "${TranslateBestRatio}"
    ;;
+
+
+  "loop_translate")
+      # The beam size for prediction
+      TranslateBeamSize=$(parse_yaml "${ConfigFile}" "translate" "beam_size")
+      [ -z "${TranslateBeamSize}" ] &&  TranslateBeamSize=1
+
+      TranslateNBest=$(parse_yaml "${ConfigFile}" "translate" "n_best")
+      [ -z "${TranslateNBest}" ] && TranslateNBest=1
+
+      TranslateBestRatio=1.0
+
+      for model in `ls ${DataOutputPath}/*.pt`; do
+#        echo $model
+        loop_translate ${TranslateBeamSize} "${TranslateNBest}" "${TranslateBestRatio}" ${model}
+      done
+  ;;
 
    "all")
       _train
