@@ -18,37 +18,37 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  save_model: examples/learning_fix/data/small/2/small
-  train_from: examples/learning_fix/data/small/2/small-step-1000000-acc-84.45-ppl-1.69-xent-0.52.pt
+#  train_from: examples/learning_fix/data/small/2/small-step-100000-acc-95.04-ppl-1.19-xent-0.18.pt
   save_checkpoint_steps: 5000
-  keep_checkpoint: 10
+  keep_checkpoint: 1000
   seed: 3435
-  train_steps: 2000000
+  train_steps: 200000
   valid_steps: 5000
-  early_stopping: 5
+  early_stopping: 10
   warmup_steps: 4000
   report_every: 1000
 
+
   decoder_type: transformer
   encoder_type: transformer
-  word_vec_size: 128
-  rnn_size: 128
+  word_vec_size: 512
+  rnn_size: 512
   layers: 6
-  transformer_ff: 512
+  transformer_ff: 2048
   heads: 8
 
-  accum_count: 8
+  accum_count: 1
   optim: adam
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
-  learning_rate: 0.001
-  max_grad_norm: 0.0
+  learning_rate: 0.01
+  max_grad_norm: 5
 
-  batch_size: 1024
+  batch_size: 4096
   batch_type: tokens
   normalization: tokens
-  dropout: 0.1
+  dropout: 0.2
   label_smoothing: 0.1
 
   max_generator_batches: 2
@@ -57,7 +57,15 @@ train:
   param_init_glorot: 'true'
   position_encoding: 'true'
 
-  master_port: 8001
+
+  sampling_type: "scheduled"
+  mixture_type: "all_teacher_suggesting"
+  transformer_scheduled_activation: "gumbel"
+  scheduled_sampling_decay: "sigmoid"
+  scheduled_sampling_k: 100000
+  transformer_scheduled_alpha: 0.5
+
+  master_port: 8002
   world_size: 4
   gpu_ranks:
     - 0
@@ -67,16 +75,13 @@ train:
 
 translate:
   work_model: translate
+#  model: examples/learning_fix/data/small/10/small-step-132000-acc-95.46-ppl-1.17-xent-0.16.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
-  model: examples/learning_fix/data/small/2/small-step-1000000-acc-84.45-ppl-1.69-xent-0.52.pt
-  output: examples/learning_fix/data/small/2/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
   max_length: 100
-  batch_size: 1024
-  n_best: 50
-  beam_size: 50
-#  gpu: 0
+  batch_size: 16
+  gpu: 0
 #  report_align: 'true'

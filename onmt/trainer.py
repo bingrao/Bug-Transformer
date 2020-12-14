@@ -411,7 +411,7 @@ class Trainer(object):
                 trunc_size = target_size
 
             batch = self.maybe_noise_source(batch)
-
+            # torch.Size([42, 83, 1])
             src, src_lengths = batch.src if isinstance(batch.src, tuple) \
                 else (batch.src, None)
             if src_lengths is not None:
@@ -443,7 +443,7 @@ class Trainer(object):
                         outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
                                                     with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
                     else:
-                        dec_in = tgt[:-1]  # exclude last target from inputs
+                        dec_in = tgt[:-1]  # exclude last target from inputs, torch.Size([49, 83, 1])
                         tgt_pos = tgt_pos[:-1] if tgt_pos is not None else tgt_pos
 
                         # 1. Go through the encoder
@@ -486,17 +486,17 @@ class Trainer(object):
                             model_prediction_emb = model_prediction_emb.view(batch.batch_size, -1, emb_size).transpose(
                                 0, 1)
                         elif self._mixture_type and 'all' in self._mixture_type:
-                            logits = self._scheduled_activation_function(logits)
+                            logits = self._scheduled_activation_function(logits)  # torch.Size([49, 83, 503])
 
                             # weights = logits
                             # Get the indices of all words in the vocabulary
                             ind = torch.cuda.LongTensor([i for i in range(logits.shape[2])])
                             # We need this format of the indices to ge tht embeddings from the decoder
                             ind = ind.unsqueeze(0).unsqueeze(0).unsqueeze(0)
-                            embeddings = self.model.decoder.embeddings(ind, step=0)[0][0]
+                            embeddings = self.model.decoder.embeddings(ind, step=0)[0][0] # torch.Size([503, 512])
 
                             # The predicted embedding is the weighted sum of the words in the vocabulary
-                            model_prediction_emb = torch.matmul(logits, embeddings)
+                            model_prediction_emb = torch.matmul(logits, embeddings) # torch.Size([49, 83, 512])
                         else:
                             # Just get the argmax from the model predictions
                             logits = self.model.generator[1](logits)
@@ -504,7 +504,7 @@ class Trainer(object):
                             model_prediction_emb = self.model.decoder.embeddings(model_predictions)
 
                         # Get the embeddings of the gold target sequence.
-                        tgt_emb = self.model.decoder.embeddings(dec_in, step=step, position=tgt_pos)
+                        tgt_emb = self.model.decoder.embeddings(dec_in, step=step, position=tgt_pos) # torch.Size([49, 83, 512])
 
                         # 3. Combine the gold target with the model predictions
                         if self._peeling_back == 'strict':
@@ -513,12 +513,12 @@ class Trainer(object):
                             tf_tgt_emb = torch.cat((tgt_emb[:tf_tgt_section], model_prediction_emb[tf_tgt_section:]))
                         else:
                             # Use scheduled sampling - on each step decide
-                            # whether to use teacher forcing or model predictions.
+                            # whether to use teacher forcing or model predictions. [..., torch.Size([1, 83, 512]), ...]
                             tf_tgt_emb = [tgt_emb[i].unsqueeze(0)
                                           if random.random() <= teacher_forcing_ratio else
                                           model_prediction_emb[i].unsqueeze(0) for i in range(target_size - 1)]
 
-                            tf_tgt_emb = torch.cat((tf_tgt_emb), dim=0)
+                            tf_tgt_emb = torch.cat((tf_tgt_emb), dim=0) # torch.Size([49, 83, 512])
                         # Rerun the forward pass with the new target context
                         outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos,
                                                             memory_lengths=lengths, with_align=self.with_align,
