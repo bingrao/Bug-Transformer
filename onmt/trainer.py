@@ -17,6 +17,12 @@ from onmt.utils.logging import logger
 from onmt.translate.translator import SimpleGreedySearch
 from statistics import mean
 from onmt.utils.statistics import ScoreMetrics
+import onmt.modules, onmt.modules.softmax_extended
+from onmt.utils.distributed import all_gather_list, all_reduce_and_rescale_tensors
+from onmt.inputters.inputter import make_features
+import random
+import math
+
 
 def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
     """
@@ -24,6 +30,7 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
 
     Args:
         opt (:obj:`Namespace`): user options (usually from argument parsing)
+        device_id:
         model (:obj:`onmt.models.NMTModel`): the model to train
         fields (dict): dict of fields
         optim (:obj:`onmt.utils.Optimizer`): optimizer used during training
@@ -130,6 +137,7 @@ class Trainer(object):
                  earlystopper=None, dropout=[0.3], dropout_steps=[0],
                  source_noise=None,
                  opt=None):
+
         # Basic attributes.
         self.model = model
         self.train_loss = train_loss
@@ -158,6 +166,32 @@ class Trainer(object):
         self.position_encoding = opt.position_encoding
         self.position_style = opt.position_style
         self.external_evaluators = opt.external_evaluators
+
+        # Bing: Scheduled Samples
+        self._sampling_type = opt.sampling_type
+        self._scheduled_sampling_decay = opt.scheduled_sampling_decay
+        self._scheduled_sampling_k = opt.scheduled_sampling_k
+        self._scheduled_sampling_c = opt.scheduled_sampling_c
+        self._scheduled_sampling_limit = opt.scheduled_sampling_limit
+        self._mixture_type = opt.mixture_type
+        self._k = opt.topk_value
+        self._peeling_back = opt.peeling_back
+        self._twopass = opt.decoder_type == 'transformer'
+        self._passone_nograd = (not opt.transformer_passone) or \
+                               (opt.transformer_passone and opt.transformer_passone == 'nograd')
+        if opt.transformer_scheduled_activation == "sparsemax":
+            self._scheduled_activation_function = \
+                onmt.modules.sparse_activations.Sparsemax(dim=-1)
+        elif opt.transformer_scheduled_activation == "gumbel":
+            self._scheduled_activation_function = \
+                onmt.modules.softmax_extended.GumbelSoftmax(dim=-1,
+                                                            alpha=opt.transformer_scheduled_alpha)
+        elif opt.transformer_scheduled_activation == "softmax_temp":
+            self._scheduled_activation_function = \
+                onmt.modules.softmax_extended.SoftmaxWithTemperature(dim=-1,
+                                                                     alpha=opt.transformer_scheduled_alpha)
+        else:
+            self._scheduled_activation_function = torch.nn.Softmax(dim=-1)
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -252,19 +286,18 @@ class Trainer(object):
             step = self.optim.training_step
             # UPDATE DROPOUT
             self._maybe_update_dropout(step)
-            # logger.info(f"[{step}/{train_steps}] ...")
+
             if self.gpu_verbose_level > 1:
                 logger.info("GpuRank %d: index: %d", self.gpu_rank, i)
             if self.gpu_verbose_level > 0:
                 logger.info("GpuRank %d: reduce_counter: %d \
                             n_minibatch %d"
                             % (self.gpu_rank, i + 1, len(batches)))
-
             if self.n_gpu > 1:
                 normalization = sum(onmt.utils.distributed.all_gather_list(normalization))
 
             # Here submit batch for training ...
-            self._gradient_accumulation(batches, normalization, total_stats, report_stats)
+            self._gradient_accumulation(batches, normalization, total_stats, report_stats, step)
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)
@@ -363,10 +396,9 @@ class Trainer(object):
 
         # bleus = mean(all_bleu_scores) if self.external_evaluators != 'none' else 0.0
 
-
         return stats, metric_scores
 
-    def _gradient_accumulation(self, true_batches, normalization, total_stats, report_stats):
+    def _gradient_accumulation(self, true_batches, normalization, total_stats, report_stats, step):
         if self.accum_count > 1:
             self.optim.zero_grad()
 
@@ -403,8 +435,97 @@ class Trainer(object):
                 if self.accum_count == 1:
                     self.optim.zero_grad()
 
-                outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
-                                            with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
+                if self._sampling_type != "None" and self._twopass:  # Transformer
+                    teacher_forcing_ratio = self._calc_teacher_forcing_ratio(step)
+                    tf_tgt_section = round(target_size * teacher_forcing_ratio)
+                    if teacher_forcing_ratio >= 1 or tf_tgt_section >= target_size:
+                        # The standard model
+                        outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
+                                                    with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
+                    else:
+                        dec_in = tgt[:-1]  # exclude last target from inputs
+                        tgt_pos = tgt_pos[:-1] if tgt_pos is not None else tgt_pos
+
+                        # 1. Go through the encoder
+                        enc_state, memory_bank, lengths = \
+                            self.model.encoder(src, src_lengths, position=src_pos)
+
+                        if bptt is False:
+                            self.model.decoder.init_state(src, memory_bank, enc_state)
+
+                        # This part can be with grad or no_grad
+                        if self._passone_nograd:
+                            with torch.no_grad():
+                                outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos,
+                                                                    memory_lengths=lengths, with_align=self.with_align)
+                                logits = self.model.generator[0](outputs)
+
+                        else:
+                            outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos,
+                                                                memory_lengths=lengths, with_align=self.with_align)
+                            logits = self.model.generator[0](outputs)
+
+                        # 2. Get the embeddings from the model predictions
+                        if self._mixture_type and 'topk' in self._mixture_type:
+                            k = self._k
+                            emb_weights, top_k_tgt = logits.topk(k, dim=-1)
+
+                            # Needed for getting the embeddings
+                            top_k_tgt = top_k_tgt.unsqueeze(-2)
+
+                            # k_embs: batch x k x emb size
+                            k_embs = self.model.decoder.embeddings(top_k_tgt, step=0).transpose(2, 3)
+                            # weights: batch x sequence length x k x 1
+                            # Normalize the weights
+                            emb_weights /= emb_weights.sum(dim=-1).unsqueeze(2)
+                            weights = emb_weights.unsqueeze(3)
+                            emb_size = k_embs.shape[2]
+                            embeddings = self.model.decoder.embeddings(top_k_tgt, step=0)
+                            model_prediction_emb = torch.bmm(k_embs.view(-1, emb_size, k),
+                                                             weights.view(-1, k, 1))  # .transpose(0, 1)
+                            model_prediction_emb = model_prediction_emb.view(batch.batch_size, -1, emb_size).transpose(
+                                0, 1)
+                        elif self._mixture_type and 'all' in self._mixture_type:
+                            logits = self._scheduled_activation_function(logits)
+
+                            # weights = logits
+                            # Get the indices of all words in the vocabulary
+                            ind = torch.cuda.LongTensor([i for i in range(logits.shape[2])])
+                            # We need this format of the indices to ge tht embeddings from the decoder
+                            ind = ind.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+                            embeddings = self.model.decoder.embeddings(ind, step=0)[0][0]
+
+                            # The predicted embedding is the weighted sum of the words in the vocabulary
+                            model_prediction_emb = torch.matmul(logits, embeddings)
+                        else:
+                            # Just get the argmax from the model predictions
+                            logits = self.model.generator[1](logits)
+                            model_predictions = logits.argmax(dim=2).unsqueeze(2)
+                            model_prediction_emb = self.model.decoder.embeddings(model_predictions)
+
+                        # Get the embeddings of the gold target sequence.
+                        tgt_emb = self.model.decoder.embeddings(dec_in, step=step, position=tgt_pos)
+
+                        # 3. Combine the gold target with the model predictions
+                        if self._peeling_back == 'strict':
+                            # Combine the two sequences with peelingback
+                            # First part from the gold, second part from the model predictions
+                            tf_tgt_emb = torch.cat((tgt_emb[:tf_tgt_section], model_prediction_emb[tf_tgt_section:]))
+                        else:
+                            # Use scheduled sampling - on each step decide
+                            # whether to use teacher forcing or model predictions.
+                            tf_tgt_emb = [tgt_emb[i].unsqueeze(0)
+                                          if random.random() <= teacher_forcing_ratio else
+                                          model_prediction_emb[i].unsqueeze(0) for i in range(target_size - 1)]
+
+                            tf_tgt_emb = torch.cat((tf_tgt_emb), dim=0)
+                        # Rerun the forward pass with the new target context
+                        outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos,
+                                                            memory_lengths=lengths, with_align=self.with_align,
+                                                            tf_emb=tf_tgt_emb)
+                else:
+                    outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
+                                                with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
                 bptt = True
 
                 # 3. Compute loss.
@@ -509,3 +630,25 @@ class Trainer(object):
         if self.source_noise is not None:
             return self.source_noise(batch)
         return batch
+
+    def _calc_teacher_forcing_ratio(self, step):
+        if self._sampling_type == "teacher_forcing":
+            return 1.0
+        elif self._sampling_type == "scheduled":  # scheduled sampling
+            if self._scheduled_sampling_decay == "exp":
+                scheduled_ratio = self._scheduled_sampling_k ** step
+            elif self._scheduled_sampling_decay == "sigmoid":
+                if step / self._scheduled_sampling_k > 700:
+                    scheduled_ratio = 0
+                else:
+                    scheduled_ratio = self._scheduled_sampling_k / (
+                            self._scheduled_sampling_k
+                            + math.exp(step / self._scheduled_sampling_k)
+                    )
+            else:  # linear
+                scheduled_ratio = self._scheduled_sampling_k - \
+                                  self._scheduled_sampling_c * step
+            scheduled_ratio = max(self._scheduled_sampling_limit, scheduled_ratio)
+            return scheduled_ratio
+        else:  # always sample from the model predictions
+            return 0.0

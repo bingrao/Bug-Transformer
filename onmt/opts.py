@@ -7,6 +7,12 @@ import onmt
 from onmt.models.sru import CheckSRU
 
 
+def none_or_int(value):
+    if value == 'None':
+        return None
+    return value
+
+
 def config_opts(parser):
     parser.add('-config', '--config', required=False,
                is_config_file_arg=True, help='config file path')
@@ -471,6 +477,7 @@ def train_opts(parser):
               help="If a valid path is specified, then this will load "
                    "pretrained word embeddings on the decoder side. "
                    "See README for specific formatting instructions.")
+
     # Fixed word vectors
     group.add('--fix_word_vecs_enc', '-fix_word_vecs_enc',
               action='store_true',
@@ -621,7 +628,7 @@ def train_opts(parser):
                    "this much if steps have gone past "
                    "start_decay_steps")
     group.add('--start_decay_steps', '-start_decay_steps',
-              type=int, default=50000,
+              type=none_or_int, default=None,
               help="Start decaying every decay_steps after "
                    "start_decay_steps")
     group.add('--decay_steps', '-decay_steps', type=int, default=10000,
@@ -667,6 +674,56 @@ def train_opts(parser):
               type=int, default=3, choices=[3, 1],
               help="Using grayscale image can training "
                    "model faster and smaller")
+
+    # Bing: Different teacher forcing techniques
+    group = parser.add_argument_group('Teacher Forcing')
+    group.add('--sampling_type', '-sampling_type', type=str,
+              default='None', choices=['teacher_forcing', 'always_sample', 'scheduled', 'None'],
+              help="""The sampling strategy for the decoder input.
+              Can be one of the values: teacher_forcing, always_sample, scheduled""")
+    group.add('--scheduled_sampling_decay', '-scheduled_sampling_decay',
+              type=str, default="exp", choices=['linear', 'exp', 'sigmoid'],
+              help="""Scheduled sampling decay. Can be one of the values:
+              linear, exp, sigmoid.""")
+    group.add('--scheduled_sampling_k', '-scheduled_sampling_k',
+              type=float, default=1.0,
+              help="""Const k for the scheduled sampling decay.
+              The value depends on the selected decay schedule.""")
+    group.add('--scheduled_sampling_c', '-scheduled_sampling_c',
+              type=float, default=1.0,
+              help="""Const c for scheduled sampling
+              with linear decay.""")
+    group.add('--scheduled_sampling_limit', '-scheduled_sampling_limit', type=float, default=0.0,
+              help="""Minimum decay value for scheduled sampling
+              with linear decay.""")
+    group.add('--mixture_type', '-mixture_type', type=str, default=None,
+              choices=['topk', 'all',
+                       'topk_tf_mean_mix', 'all_tf_mean_mix',
+                       'topk_teacher_suggesting', 'all_teacher_suggesting',
+                       'topk_tf_gate', 'all_tf_gate'],
+              help="""Which method to use when the tgt embedding is created
+              for non-teacher forcing techniques""")
+    group.add('--topk_value', '-topk_value', type=int, default=1,
+              help="""K value for mixture of input tgt embeddings""")
+    group.add('--peeling_back', '-peeling_back', type=str, default=None,
+              choices=['strict'],
+              help="""Type of peeling back the teacher forcing to the
+              end of the sequence. Strict=the specified of teacher forcing
+              ratio defines the part of the sequnce which uses teacher forcing,
+              the rest of the sequence uses the model predictions.""")
+    group.add('--transformer_passone', '-transformer_passone', type=str, default='nograd',
+              choices=['grad', 'nograd'],
+              help="""When using scheduled sampling for transformer, 
+              use no_grad or not for the first pass.""")
+    group.add('--transformer_scheduled_activation', '-transformer_scheduled_activation',
+              type=str, default='softmax',
+              choices=['softmax', 'sparsemax', 'gumbel', 'softmax_temp'],
+              help="""When using scheduled sampling for transformer, 
+              specify the activation used for merging the previous step embeddings.""")
+    group.add('--transformer_scheduled_alpha', '-transformer_scheduled_alpha',
+              type=float, default=1.0,
+              help="""When using scheduled sampling for transformer, 
+              define the softmax temperature used for merging the previous step embeddings.""")
 
 
 def translate_opts(parser):
