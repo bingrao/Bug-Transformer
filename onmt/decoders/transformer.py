@@ -293,7 +293,14 @@ class TransformerDecoder(DecoderBase):
 
         tgt_words = tgt[:, :, 0].transpose(0, 1)
 
-        emb = self.embeddings(tgt, step=step, position=position)
+        # Add by Bing: Scheduler samples
+        if 'tf_emb' in kwargs.keys() and kwargs['tf_emb'] is not None:
+            emb = kwargs['tf_emb']
+        else:
+            emb = self.embeddings(tgt, step=step, position=position)
+
+        # emb = self.embeddings(tgt, step=step, position=position)
+
         assert emb.dim() == 3  # len x batch x embedding_dim
 
         output = emb.transpose(0, 1).contiguous()

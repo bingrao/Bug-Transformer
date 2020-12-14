@@ -193,6 +193,13 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         if model_opt.share_decoder_embeddings:
             generator.linear.weight = decoder.embeddings.word_lut.weight
 
+    # Bing: scheduled sampled
+    if model_opt.sampling_type == 'always_sample' \
+            and model_opt.mixture_type \
+            and 'tf_gate' in model_opt.mixture_type:
+
+        model.tf_gate = nn.Sequential(nn.Linear(len(fields["tgt"].vocab), 1), nn.Sigmoid())
+
     # Load the model states from checkpoint or initialize them.
     if checkpoint is not None:
         # This preserves backward-compat for models using customed layernorm
