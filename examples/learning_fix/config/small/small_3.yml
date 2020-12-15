@@ -64,6 +64,7 @@ train:
   scheduled_sampling_decay: "sigmoid"
   scheduled_sampling_k: 200000
   transformer_scheduled_alpha: 0.5
+  external_evaluators: 'bleu'
 
   master_port: 8003
   world_size: 4
