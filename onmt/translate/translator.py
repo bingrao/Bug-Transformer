@@ -18,6 +18,7 @@ from onmt.utils.alignment import extract_alignment, build_align_pharaoh
 from onmt.modules.copy_generator import collapse_copy_scores
 from onmt.utils.scores import make_ext_evaluators
 
+
 def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
         out_file = codecs.open(opt.output, 'w+', 'utf-8')
@@ -380,7 +381,7 @@ class Translator(object):
                                           in align_pharaohs]
                     n_best_preds = [pred + " ||| " + align
                                     for pred, align in zip(
-                                        n_best_preds, n_best_preds_align)]
+                            n_best_preds, n_best_preds_align)]
                 all_predictions += [n_best_preds]
                 self.out_file.write('\n'.join(n_best_preds) + '\n')
                 self.out_file.flush()
@@ -435,9 +436,9 @@ class Translator(object):
             total_time = end_time - start_time
             self._log("Total translation time (s): %f" % total_time)
             self._log("Average translation time (s): %f" % (
-                total_time / len(all_predictions)))
+                    total_time / len(all_predictions)))
             self._log("Tokens per second: %f" % (
-                pred_words_total / total_time))
+                    pred_words_total / total_time))
 
         if self.dump_beam:
             import json
@@ -552,16 +553,16 @@ class Translator(object):
 
     def _run_encoder(self, batch):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                           else (batch.src, None)
+            else (batch.src, None)
 
         enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths)
         if src_lengths is None:
             assert not isinstance(memory_bank, tuple), \
                 'Ensemble decoding only supported for text data'
             src_lengths = torch.Tensor(batch.batch_size) \
-                               .type_as(memory_bank) \
-                               .long() \
-                               .fill_(memory_bank.size(0))
+                .type_as(memory_bank) \
+                .long() \
+                .fill_(memory_bank.size(0))
         return src, enc_states, memory_bank, src_lengths
 
     def _decode_and_generate(
@@ -773,7 +774,6 @@ class SimpleGreedySearch(Translator):
         )
 
         self.ext_evaluators = make_ext_evaluators(external_evaluators)
-
 
     def batch_bleu_score(self, batch):
         all_scores = []

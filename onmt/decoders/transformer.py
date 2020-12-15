@@ -299,8 +299,6 @@ class TransformerDecoder(DecoderBase):
         else:
             emb = self.embeddings(tgt, step=step, position=position)
 
-        # emb = self.embeddings(tgt, step=step, position=position)
-
         assert emb.dim() == 3  # len x batch x embedding_dim
 
         output = emb.transpose(0, 1).contiguous()
