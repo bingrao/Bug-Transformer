@@ -62,7 +62,7 @@ train:
   mixture_type: "all_teacher_suggesting"
   transformer_scheduled_activation: "gumbel"
   scheduled_sampling_decay: "sigmoid"
-  scheduled_sampling_k: 200000
+  scheduled_sampling_k: 2000
   transformer_scheduled_alpha: 0.5
   external_evaluators: 'bleu'
 

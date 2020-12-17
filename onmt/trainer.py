@@ -411,7 +411,7 @@ class Trainer(object):
                 trunc_size = target_size
 
             batch = self.maybe_noise_source(batch)
-            # torch.Size([42, 83, 1])
+            # src: [src_len, batch_size, 1] e.g. torch.Size([42, 83, 1])
             src, src_lengths = batch.src if isinstance(batch.src, tuple) \
                 else (batch.src, None)
             if src_lengths is not None:
@@ -554,15 +554,14 @@ class Trainer(object):
                 scheduled_ratio = self._scheduled_sampling_k ** step
             elif self._scheduled_sampling_decay == "sigmoid":
                 if step / self._scheduled_sampling_k > 700:
-                    scheduled_ratio = 0
+                    scheduled_ratio = 0.0
                 else:
                     scheduled_ratio = self._scheduled_sampling_k / (
                             self._scheduled_sampling_k
                             + math.exp(step / self._scheduled_sampling_k)
                     )
             else:  # linear
-                scheduled_ratio = self._scheduled_sampling_k - \
-                                  self._scheduled_sampling_c * step
+                scheduled_ratio = self._scheduled_sampling_k - self._scheduled_sampling_c * step
             scheduled_ratio = max(self._scheduled_sampling_limit, scheduled_ratio)
             return scheduled_ratio
         else:  # always sample from the model predictions
@@ -570,6 +569,21 @@ class Trainer(object):
 
     def schedule_samples_model(self, src, tgt, src_lengths, tgt_lengths,
                                src_pos, tgt_pos, batch_size, bptt, step):
+        """
+        :param src: [src_len, batch_size, 1], e.g. torch.Size([48, 61, 1])
+        :param tgt: [tgt_len, batch_size, 1], e.g. torch.Size([68, 61, 1])
+        :param src_lengths: [batch_size], e.g. torch.Size([61])
+        :param tgt_lengths: 68
+        :param src_pos:
+        :param tgt_pos:
+        :param batch_size: 61
+        :param bptt:
+        :param step:
+        :return:
+            outputs: [tgt_len - 1, batch_size, dim], e.g. torch.Size([67, 61, 512])
+            attns:   [tgt_len - 1, batch_size, src_len], e.g. torch.Size([67, 61, 48])
+        """
+
         # Teacher Forcing decay ratio during training
         tf_ratio = self._calc_teacher_forcing_ratio(step)
 
@@ -578,26 +592,37 @@ class Trainer(object):
 
         if tf_tgt_section >= tgt_lengths:
             # The standard model
+            # outputs: [tgt_len - 1, batch_size, dim], e.g. torch.Size([67, 61, 512])
+            # attns: [tgt_len - 1, batch_size, src_len], e.g. torch.Size([67, 61, 48])
             outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
                                         with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
         else:
-            # exclude last target from inputs, Shape: [length_seq, batch_size, 1], e.g. torch.Size([49, 83, 1])
+            # exclude last target from inputs
+            # Shape: [tgt_len - 1, batch_size, 1], e.g. dec_in: torch.Size([67, 61, 1])
             dec_in = tgt[:-1]
             tgt_pos = tgt_pos[:-1] if tgt_pos is not None else tgt_pos
 
-            # 1. Go through the encoder
+            # 1. Go through the encoder,
+            # enc_state/memory_bank: [src_len, batch_size, dim], e.g. torch.Size([48, 61, 512])
+            # lengths: [batch_size], e.g. torch.Size([61]) == src_lengths
             enc_state, memory_bank, lengths = \
                 self.model.encoder(src, src_lengths, position=src_pos)
 
             if bptt is False:
                 self.model.decoder.init_state(src, memory_bank, enc_state)
 
-            # This part can be with grad or no_grad
+            # This part can be with grad or no_grad.
             if self._passone_nograd:
                 with torch.no_grad():
+                    # outputs: [tgt_len - 1, batch_size, dim], e.g.  torch.Size([67, 61, 512])
+                    # attns['std'].shape: [tgt_len - 1, batch_size, src_len], e.g. torch.Size([67, 61, 48])
                     outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos,
                                                         memory_lengths=lengths, with_align=self.with_align)
+                    # logits: [tgt_len - 1, batch_size, vocab_size] e.g. torch.Size([67, 61, 503])
                     logits = self.model.generator[0](outputs)
+
+                    # logits: [tgt_len - 1, batch_size, vocab_size] e.g. torch.Size([67, 61, 503])
+                    # logits = self.model.generator(outputs)
 
             else:
                 outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos,
@@ -625,29 +650,35 @@ class Trainer(object):
                 model_prediction_emb = model_prediction_emb.view(batch_size, -1, emb_size).transpose(
                     0, 1)
             elif self._mixture_type and 'all' in self._mixture_type:
-                # Shape: [length_seq, batch_size, vocab_size], e.g. torch.Size([49, 83, 503])
+                # logits: [tgt_len - 1, batch_size, vocab_size] e.g. torch.Size([67, 61, 503])
                 logits = self._scheduled_activation_function(logits)
 
                 # weights = logits
-                # Get the indices of all words in the vocabulary
+                # Get the indices of all words in the vocabulary,
+                # ind: [vocab_size] e.g. torch.Size([503])
                 ind = torch.cuda.LongTensor([i for i in range(logits.shape[2])])
+
                 # We need this format of the indices to ge tht embeddings from the decoder
+                # ind: [1, 1, 1, vocab_size] e.g. torch.Size([1, 1, 1, 503])
                 ind = ind.unsqueeze(0).unsqueeze(0).unsqueeze(0)
 
-                # Shape: torch.Size([503, 512])
+                # Shape: [vocab_size, dim] e.g. torch.Size([503, 512])
                 embeddings = self.model.decoder.embeddings(ind)[0][0]
 
                 # The predicted embedding is the weighted sum of the words in the vocabulary
-                # Shape: torch.Size([49, 83, 512])
+                # Shape: [tgt_len - 1, batch_size, dim] e.g. torch.Size([67, 61, 512])
                 model_prediction_emb = torch.matmul(logits, embeddings)
             else:
                 # Just get the argmax from the model predictions
+                # [tgt_len - 1, batch_size, vocab_size] e.g. torch.Size([67, 61, 503])
                 logits = self.model.generator[1](logits)
+                # [tgt_len - 1, batch_size, 1] e.g. torch.Size([67, 61, 1])
                 model_predictions = logits.argmax(dim=2).unsqueeze(2)
+                # [tgt_len - 1, batch_size, dim] e.g. torch.Size([67, 61, 512])
                 model_prediction_emb = self.model.decoder.embeddings(model_predictions, position=tgt_pos)
 
             # Get the embeddings of the gold target sequence.
-            # Shape: torch.Size([49, 83, 512])
+            # Shape: [tgt_len - 1, batch_size, dim] e.g. torch.Size([67, 61, 512])
             tgt_emb = self.model.decoder.embeddings(dec_in, position=tgt_pos)
 
             # 3. Combine the gold target with the model predictions
@@ -655,20 +686,24 @@ class Trainer(object):
                 # Combine the two sequences with peelingback
                 # First part from the gold, second part from the model predictions
                 tf_tgt_emb = torch.cat((tgt_emb[:tf_tgt_section], model_prediction_emb[tf_tgt_section:]))
-            else:
+            elif tf_ratio > 0.0:
                 # Use scheduled sampling - on each step decide
                 # whether to use teacher forcing or model predictions.
-                # Shape: [..., torch.Size([1, 83, 512]), ...]
+                # Shape: [..., torch.Size([1, 61, 512]), ...]
                 tf_tgt_emb = [tgt_emb[i].unsqueeze(0)
                               if random.random() <= tf_ratio else
                               model_prediction_emb[i].unsqueeze(0) for i in range(tgt_lengths - 1)]
 
-                # Shape: torch.Size([49, 83, 512])
-                tf_tgt_emb = torch.cat((tf_tgt_emb), dim=0)
+                # Shape: [tgt_len - 1, batch_size, dim] e.g. torch.Size([67, 61, 512])
+                tf_tgt_emb = torch.cat(tf_tgt_emb, dim=0)
+            else:
+                # tf_ratio == 0.0
+                tf_tgt_emb = tgt_emb + model_prediction_emb
 
-            # Rerun the forward pass with the new target context
-            outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos,
-                                                memory_lengths=lengths, with_align=self.with_align,
-                                                tf_emb=tf_tgt_emb)
+            # Rerun the forward pass with the new target context,
+            # outputs: [tgt_len - 1, batch_size, dim] e.g. torch.Size([67, 61, 512])
+            # attns['std'].shape: [tgt_len - 1, batch_size, src_len] e.g. torch.Size([67, 61, 48])
+            outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos, memory_lengths=lengths,
+                                                with_align=self.with_align, tf_emb=tf_tgt_emb)
 
         return outputs, attns

@@ -111,7 +111,6 @@ def build_loss_compute(model, tgt_field, opt, train=True):
     else:
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
 
-
     # if the loss function operates on vectors of raw logits instead of
     # probabilities, only the first part of the generator needs to be
     # passed to the NMTLossCompute. At the moment, the only supported
@@ -232,7 +231,7 @@ class LossComputeBase(nn.Module):
             # loss = loss - match_loss * 0.001
             return loss, stats
         batch_stats = onmt.utils.Statistics()
-        for shard in shards(shard_state, shard_size):
+        for shard in shards(shard_state, shard_size):  # shard['output'].shape, torch.Size([2, 61, 512]), shard['target'].shape: torch.Size([2, 61])
             _loss, stats, match_loss = self._compute_loss(batch, **shard)
             loss = _loss.div(float(normalization))
 
@@ -288,7 +287,7 @@ class LabelSmoothingLoss(nn.Module):
 
     def forward(self, output, target):
         """
-        output (FloatTensor): batch_size x n_classes
+        output (FloatTensor): batch_size x n_classes (vocab_size)
         target (LongTensor): batch_size
         """
         model_prob = self.one_hot.repeat(target.size(0), 1)
@@ -310,7 +309,17 @@ class NMTLossCompute(LossComputeBase):
         self.lambda_align = lambda_align
 
     def _make_shard_state(self, batch, output, range_, attns=None):
+        """
+
+        :param batch:
+        :param output: output.shape: [tgt_len, batch_size, dim] e.g. torch.Size([67, 61, 512])
+        :param range_:
+        :param attns:
+        :return:
+        """
         shard_state = {
+            # output.shape: [tgt_len, batch_size, dim] e.g.torch.Size([67, 61, 512])
+            # target.shape: [tgt_len, batch_size] e.g.torch.Size([67, 61])
             "output": output,
             "target": batch.tgt[range_[0] + 1: range_[1], :, 0],
         }
@@ -354,10 +363,24 @@ class NMTLossCompute(LossComputeBase):
 
     def _compute_loss(self, batch, output, target, std_attn=None,
                       coverage_attn=None, align_head=None, ref_align=None):
+        """
 
+        :param batch:
+        :param output: shard['output'].shape [shard_size, bath_size, dim] e.g. torch.Size([2, 61, 512])
+        :param target: shard['target'].shape,[shard_size, batch_size] e.g. torch.Size([2, 61])
+        :param std_attn:
+        :param coverage_attn:
+        :param align_head:
+        :param ref_align:
+        :return:
+        """
+        # bottled_output.shape: [shard_size*batch_size, dim] e.g. torch.Size([122, 512])
         bottled_output = self._bottle(output)
 
+        # score.shape: [shard_size*batch_size, vocab_size] e.g. torch.Size([122, 503])
         scores = self.generator(bottled_output)
+
+        # gtruth.shape: [shard_size*batch_size] e.g. torch.Size([122])
         gtruth = target.view(-1)
 
         match_loss = get_max_match_greedy_decode(scores, gtruth).div(float(gtruth.shape[0]))

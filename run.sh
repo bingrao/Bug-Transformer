@@ -14,10 +14,12 @@ DataPath=${ProjectPath}/data; [ -d "$DataPath" ] || mkdir -p "$DataPath"
 CurrentDate=$(date +%F)
 
 function help() {
-     echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset[small|median|big|small_old] target[abstract|preprocess|train|translate|all|inference|performance] configFile" >&2
+     echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset target configFile" >&2
+     echo "       dataset: [small|median|big|small_old]"
+     echo "       target:  [abstract|preprocess|train|translate|all|inference|performance|loop_translate]"
      echo "Example: Using third (or first by default) GPU to train small dataset with small_1.yml config file"
      echo "Example: The default direcotry that system searches config files: ${ProjectPath}/config/[small|median|big|small_old]"
-     echo "       - export CUDA_VISIBLE_DEVICES=2; bash run.sh small train small_1.yml"
+     echo "       - export CUDA_VISIBLE_DEVICES=2,3; bash run.sh small train small_1.yml"
      echo "       - bash run.sh small train small_1.yml"
 }
 

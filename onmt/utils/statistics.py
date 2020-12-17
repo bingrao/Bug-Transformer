@@ -194,5 +194,5 @@ class ScoreMetrics(object):
     def get_statistics(self):
         reg = dict()
         for key, value in self.metrics.items():
-            reg[key] = mean(value) if len(value) > 0 else 0.0
+            reg[key] = round(mean(value), 4) if len(value) > 0 else 0.0
         return reg

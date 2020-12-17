@@ -37,7 +37,7 @@ train:
   transformer_ff: 2048
   heads: 8
 
-  accum_count: 1
+  accum_count: 8
   optim: adam
   adam_beta1: 0.9
   adam_beta2: 0.98
@@ -62,16 +62,13 @@ train:
   mixture_type: "all_teacher_suggesting"
   transformer_scheduled_activation: "gumbel"
   scheduled_sampling_decay: "sigmoid"
-  scheduled_sampling_k: 100000
+  scheduled_sampling_k: 10
   transformer_scheduled_alpha: 0.5
 
   master_port: 8002
-  world_size: 4
+  world_size: 1
   gpu_ranks:
     - 0
-    - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate
