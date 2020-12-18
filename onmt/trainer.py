@@ -605,8 +605,7 @@ class Trainer(object):
             # 1. Go through the encoder,
             # enc_state/memory_bank: [src_len, batch_size, dim], e.g. torch.Size([48, 61, 512])
             # lengths: [batch_size], e.g. torch.Size([61]) == src_lengths
-            enc_state, memory_bank, lengths = \
-                self.model.encoder(src, src_lengths, position=src_pos)
+            enc_state, memory_bank, lengths = self.model.encoder(src, src_lengths, position=src_pos)
 
             if bptt is False:
                 self.model.decoder.init_state(src, memory_bank, enc_state)
@@ -623,7 +622,6 @@ class Trainer(object):
 
                     # logits: [tgt_len - 1, batch_size, vocab_size] e.g. torch.Size([67, 61, 503])
                     # logits = self.model.generator(outputs)
-
             else:
                 outputs, attns = self.model.decoder(dec_in, memory_bank, position=tgt_pos,
                                                     memory_lengths=lengths, with_align=self.with_align)
@@ -696,8 +694,7 @@ class Trainer(object):
 
                 # Shape: [tgt_len - 1, batch_size, dim] e.g. torch.Size([67, 61, 512])
                 tf_tgt_emb = torch.cat(tf_tgt_emb, dim=0)
-            else:
-                # tf_ratio == 0.0
+            else:  # tf_ratio == 0.0
                 tf_tgt_emb = tgt_emb + model_prediction_emb
 
             # Rerun the forward pass with the new target context,
