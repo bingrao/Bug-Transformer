@@ -33,7 +33,8 @@ train:
   encoder_type: transformer
   word_vec_size: 512
   rnn_size: 512
-  layers: 6
+  enc_layers: 6
+  dec_layers: 4
   transformer_ff: 2048
   heads: 8
 
@@ -62,17 +63,15 @@ train:
   mixture_type: "all_teacher_suggesting"
   transformer_scheduled_activation: "gumbel"
   scheduled_sampling_decay: "sigmoid"
-  scheduled_sampling_k: 2000
+  scheduled_sampling_k: 10000
   transformer_scheduled_alpha: 0.5
   external_evaluators: 'bleu'
 
   master_port: 8003
-  world_size: 4
+  world_size: 2
   gpu_ranks:
     - 0
     - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate

@@ -320,7 +320,7 @@ class Trainer(object):
                 self._report_step(self.optim.learning_rate(), step, valid_stats=valid_stats)
 
                 logger.info(f"Validation scores: {scores_status.get_statistics()}")
-                logger.info(f"Teacher Forcing Ratio: {self._calc_teacher_forcing_ratio(step):.4f}")
+                logger.info(f"Teacher Forcing Ratio: {1 - self._calc_teacher_forcing_ratio(step):.4f}")
 
                 # Run patience mechanism
                 if self.earlystopper is not None:
@@ -585,7 +585,7 @@ class Trainer(object):
         """
 
         # Teacher Forcing decay ratio during training
-        tf_ratio = self._calc_teacher_forcing_ratio(step)
+        tf_ratio = 1 - self._calc_teacher_forcing_ratio(step)
 
         # The number of target ground truth selected
         tf_tgt_section = round(tgt_lengths * tf_ratio)

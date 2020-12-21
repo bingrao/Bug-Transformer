@@ -287,21 +287,33 @@ class TransformerDecoder(DecoderBase):
         self.state["src"] = self.state["src"].detach()
 
     def forward(self, tgt, memory_bank, step=None, position=None, **kwargs):
-        """Decode, possibly stepwise."""
+        """
+        :param tgt: [tgt_len - 1, batch_size, 1], e.g. tgt.shape torch.Size([67, 61, 1])
+        :param memory_bank: [src_len, bath_size, dim] e.g. memory_bank.shape torch.Size([48, 61, 512])
+        :param step:
+        :param position:
+        :param kwargs:
+        :return:
+        Decode, possibly stepwise.
+        """
         if step == 0:
             self._init_cache(memory_bank)
 
+        # tgt_words.shape, [batch_size, tgt_len - 1] torch.Size([61, 67])
         tgt_words = tgt[:, :, 0].transpose(0, 1)
 
         # Add by Bing: Scheduler samples
         if 'tf_emb' in kwargs.keys() and kwargs['tf_emb'] is not None:
             emb = kwargs['tf_emb']
         else:
+            # [tgt_len - 1, batch_size, dim]
             emb = self.embeddings(tgt, step=step, position=position)
 
         assert emb.dim() == 3  # len x batch x embedding_dim
 
+        # [batch_size, tgt_len - 1, dim]
         output = emb.transpose(0, 1).contiguous()
+        # [batch_size, src_len, dim]
         src_memory_bank = memory_bank.transpose(0, 1).contiguous()
 
         pad_idx = self.embeddings.word_padding_idx
@@ -315,6 +327,9 @@ class TransformerDecoder(DecoderBase):
 
         for i, layer in enumerate(self.transformer_layers):
             layer_cache = self.state["cache"]["layer_{}".format(i)] if step is not None else None
+            # output.shape [batch_size, tgt_len - 1, dim] torch.Size([61, 67, 512])
+            # src_memory_bank.shape [batch_size, src_len, dim] torch.Size([61, 48, 512]),
+            # attn.shape [batch_size, tgt_len - 1, src_len] e.g. torch.Size([61, 67, 48])
             output, attn, attn_align = layer(
                 output,
                 src_memory_bank,
