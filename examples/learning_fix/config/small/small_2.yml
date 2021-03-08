@@ -58,17 +58,21 @@ train:
   position_encoding: 'true'
 
 
-  sampling_type: "scheduled"
+  sampling_type: "None"
   mixture_type: "all_teacher_suggesting"
   transformer_scheduled_activation: "gumbel"
   scheduled_sampling_decay: "sigmoid"
+
   scheduled_sampling_k: 10
   transformer_scheduled_alpha: 0.5
 
   master_port: 8002
-  world_size: 1
+  world_size: 4
   gpu_ranks:
     - 0
+    - 1
+    - 2
+    - 3
 
 translate:
   work_model: translate

@@ -439,7 +439,13 @@ class Trainer(object):
                     outputs, attns = self.schedule_samples_model(src, tgt, src_lengths, target_size,
                                                                  src_pos, tgt_pos, batch.batch_size, bptt, step)
                 else:
-                    outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
+                    new_tgt = torch.zeros(tgt.shape).type_as(tgt.data)
+                    if tgt.size(0) >= src.size(0):
+                        new_tgt[:src.size(0), :, :] = src
+                    else:
+                        new_tgt = src[:tgt.size(0), :, :]
+
+                    outputs, attns = self.model(src, new_tgt, src_lengths, bptt=bptt,
                                                 with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
                 bptt = True
 
