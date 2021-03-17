@@ -132,8 +132,9 @@ class TransformerEncoder(EncoderBase):
 
         if src_path is not None:
             path_vec = self.path_embeddings(out.size(1), src_path)
-            out = out + path_vec
+            # self.register_buffer("path_vec", path_vec)
 
+            out = out + path_vec
 
         # Run the forward pass of every layer of the tranformer.
         for layer in self.transformer:

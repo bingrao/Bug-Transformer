@@ -293,14 +293,12 @@ class Embeddings(nn.Module):
             self.pe.dropout.p = dropout
 
 
-
 class PathEmbeddings(nn.Module):
     def __init__(self, node_vocab, d_model):
         super(PathEmbeddings, self).__init__()
         self.d_model = d_model
         self.embeddings = nn.Embedding(node_vocab, d_model)
         self.lstm = nn.LSTM(d_model, d_model)
-
 
     def forward(self, x, path):
         x_path, x_length = path

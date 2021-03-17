@@ -94,13 +94,14 @@ def train(opt):
 
     elif nb_gpu == 1:  # case 1 GPU only
         single_main(opt, 0)
-    else:   # case only CPU
+    else:  # case only CPU
         single_main(opt, -1)
 
 
 def batch_producer(generator_to_serve, queues, semaphore, opt):
     init_logger(opt.log_file)
     set_random_seed(opt.seed, False)
+
     # generator_to_serve = iter(generator_to_serve)
 
     def pred(x):
@@ -129,6 +130,21 @@ def batch_producer(generator_to_serve, queues, semaphore, opt):
                            for _ in b.src])
         else:
             b.src = b.src.to(torch.device(device_id))
+
+        if hasattr(b, "src_path"):
+            if isinstance(b.src_path, tuple):
+                b.src_path = tuple([_.to(torch.device(device_id))
+                                    for _ in b.src_path])
+            else:
+                b.src_path = b.src_path.to(torch.device(device_id))
+
+        if hasattr(b, "tgt_path"):
+            if isinstance(b.tgt_path, tuple):
+                b.tgt_path = tuple([_.to(torch.device(device_id))
+                                    for _ in b.tgt_path])
+            else:
+                b.tgt_path = b.tgt_path.to(torch.device(device_id))
+
         b.tgt = b.tgt.to(torch.device(device_id))
         b.indices = b.indices.to(torch.device(device_id))
         b.alignment = b.alignment.to(torch.device(device_id)) \

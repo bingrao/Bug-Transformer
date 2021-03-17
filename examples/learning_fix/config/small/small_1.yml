@@ -26,7 +26,6 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-#  train_from: examples/learning_fix/data/small/1/small-step-100000-acc-95.04-ppl-1.19-xent-0.18.pt
   save_checkpoint_steps: 2000
   keep_checkpoint: 1000
   seed: 3435
@@ -53,7 +52,7 @@ train:
   learning_rate: 0.01
   max_grad_norm: 5
 
-  batch_size: 4096
+  batch_size: 2048
   batch_type: tokens
   normalization: tokens
   dropout: 0.2
@@ -66,9 +65,12 @@ train:
   position_encoding: 'true'
 
   master_port: 8001
-  world_size: 1
+  world_size: 4
   gpu_ranks:
     - 0
+    - 1
+    - 2
+    - 3
 
 translate:
   work_model: translate

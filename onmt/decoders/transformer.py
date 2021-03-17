@@ -301,7 +301,6 @@ class TransformerDecoder(DecoderBase):
         if step == 0:
             self._init_cache(memory_bank)
 
-
         # tgt_words.shape, [batch_size, tgt_len - 1] torch.Size([61, 67])
         tgt_words = tgt[:, :, 0].transpose(0, 1)
 
@@ -315,13 +314,12 @@ class TransformerDecoder(DecoderBase):
         assert emb.dim() == 3  # len x batch x embedding_dim
         # [batch_size, tgt_len - 1, dim]
         output = emb.transpose(0, 1).contiguous()
-        tgt_path = kwargs.get('tgt_path', None)
 
+        tgt_path = kwargs.get('tgt_path', None)
         if tgt_path is not None:
             path_vec = self.path_embeddings(output.size(1), tgt_path)
+            # self.register_buffer("path_vec", path_vec)
             output = output + path_vec
-
-
 
         # [batch_size, src_len, dim]
         src_memory_bank = memory_bank.transpose(0, 1).contiguous()
