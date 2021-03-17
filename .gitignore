@@ -7,6 +7,7 @@ pred.txt
 *.sublime-*
 .DS_Store
 data/
+examples/learning_fix/data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
