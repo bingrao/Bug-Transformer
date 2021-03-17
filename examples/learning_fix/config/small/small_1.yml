@@ -63,7 +63,7 @@ train:
   param_init: 0.0
   param_init_glorot: 'true'
   position_encoding: 'true'
-  path_encoding: 'true'
+  path_encoding: 'false'
 
   master_port: 8001
   world_size: 4

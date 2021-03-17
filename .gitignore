@@ -111,3 +111,5 @@ ENV/
 
 # Tensorboard
 runs/
+
+examples/learning_fix/bin*.jar
