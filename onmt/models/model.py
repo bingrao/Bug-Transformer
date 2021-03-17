@@ -39,6 +39,7 @@ class NMTModel(nn.Module):
 
             * decoder output ``(tgt_len, batch, hidden)``
             * dictionary attention dists of ``(tgt_len, batch, src_len)``
+            :param src:
             :param tgt_pos:
             :param src_pos:
         """

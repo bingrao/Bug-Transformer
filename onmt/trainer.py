@@ -164,6 +164,7 @@ class Trainer(object):
         self.position_encoding = opt.position_encoding
         self.position_style = opt.position_style
         self.external_evaluators = opt.external_evaluators
+        self.path_encoding = opt.path_encoding
 
         # Bing: Scheduled Samples
         self._sampling_type = opt.sampling_type
@@ -419,20 +420,19 @@ class Trainer(object):
             tgt_outer = batch.tgt
 
             # if self.position_encoding and self.position_style != "index":
-            if hasattr(batch, 'src_pos') and hasattr(batch, 'tgt_pos'):
+            if self.position_encoding and hasattr(batch, 'src_pos') and hasattr(batch, 'tgt_pos'):
                 src_pos = batch.src_pos
                 tgt_pos = batch.tgt_pos
             else:
                 src_pos = None
                 tgt_pos = None
 
-            if hasattr(batch, 'src_path') and hasattr(batch, 'tgt_path'):
+            if self.path_encoding and hasattr(batch, 'src_path') and hasattr(batch, 'tgt_path'):
                 src_path = batch.src_path
                 tgt_path = batch.tgt_path
             else:
                 src_path = None
                 tgt_path = None
-
 
             bptt = False
             for j in range(0, target_size - 1, trunc_size):

@@ -11,6 +11,7 @@ from onmt.modules.position_ffn import PositionwiseFeedForward
 from onmt.utils.misc import sequence_mask
 from onmt.modules.embeddings import PathEmbeddings
 
+
 class TransformerDecoderLayer(nn.Module):
     """Transformer Decoder layer block in Pre-Norm style.
     Pre-Norm style is an improvement w.r.t. Original paper's Post-Norm style,
@@ -220,12 +221,13 @@ class TransformerDecoder(DecoderBase):
                  copy_attn, self_attn_type, dropout, attention_dropout,
                  embeddings, max_relative_positions, aan_useffn,
                  full_context_alignment, alignment_layer,
-                 alignment_heads):
+                 alignment_heads, path_encoding):
         super(TransformerDecoder, self).__init__()
 
         self.embeddings = embeddings
-
-        self.path_embeddings = PathEmbeddings(512, d_model)
+        self.path_encoding = path_encoding
+        if self.path_encoding:
+            self.path_embeddings = PathEmbeddings(512, d_model)
 
         # Decoder State
         self.state = {}
@@ -265,7 +267,8 @@ class TransformerDecoder(DecoderBase):
             opt.aan_useffn,
             opt.full_context_alignment,
             opt.alignment_layer,
-            alignment_heads=opt.alignment_heads)
+            alignment_heads=opt.alignment_heads,
+            path_encoding=opt.path_encoding)
 
     def init_state(self, src, memory_bank, enc_hidden):
         """Initialize decoder state."""
@@ -316,9 +319,8 @@ class TransformerDecoder(DecoderBase):
         output = emb.transpose(0, 1).contiguous()
 
         tgt_path = kwargs.get('tgt_path', None)
-        if tgt_path is not None:
+        if tgt_path is not None and self.path_encoding:
             path_vec = self.path_embeddings(output.size(1), tgt_path)
-            # self.register_buffer("path_vec", path_vec)
             output = output + path_vec
 
         # [batch_size, src_len, dim]

@@ -60,6 +60,10 @@ def model_opts(parser):
               choices=['index', 'tree', 'path'], help="Use a sin to mark relative words positions. "
                                                       "Necessary for non-RNN style models.")
 
+    group.add('--path_encoding', '-path_encoding', action='store_true',
+              help="Use a sin to mark relative words positions. "
+                   "Necessary for non-RNN style models.")
+
     group = parser.add_argument_group('Model-Embedding Features')
     group.add('--feat_merge', '-feat_merge', type=str, default='concat',
               choices=['concat', 'sum', 'mlp'],
