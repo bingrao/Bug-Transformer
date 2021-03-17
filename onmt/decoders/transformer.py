@@ -9,7 +9,7 @@ from onmt.decoders.decoder import DecoderBase
 from onmt.modules import MultiHeadedAttention, AverageAttention
 from onmt.modules.position_ffn import PositionwiseFeedForward
 from onmt.utils.misc import sequence_mask
-
+from onmt.modules.embeddings import PathEmbeddings
 
 class TransformerDecoderLayer(nn.Module):
     """Transformer Decoder layer block in Pre-Norm style.
@@ -108,7 +108,7 @@ class TransformerDecoderLayer(nn.Module):
         return output, top_attn, attn_align
 
     def _forward(self, inputs, memory_bank, src_pad_mask, tgt_pad_mask,
-                 layer_cache=None, step=None, future=False, position=None):
+                 layer_cache=None, step=None, future=False, position=None, **kwargs):
         """ A naive forward pass for transformer decoder.
 
         # T: could be 1 in the case of stepwise decoding or tgt_len
@@ -225,6 +225,8 @@ class TransformerDecoder(DecoderBase):
 
         self.embeddings = embeddings
 
+        self.path_embeddings = PathEmbeddings(512, d_model)
+
         # Decoder State
         self.state = {}
 
@@ -299,6 +301,7 @@ class TransformerDecoder(DecoderBase):
         if step == 0:
             self._init_cache(memory_bank)
 
+
         # tgt_words.shape, [batch_size, tgt_len - 1] torch.Size([61, 67])
         tgt_words = tgt[:, :, 0].transpose(0, 1)
 
@@ -310,9 +313,16 @@ class TransformerDecoder(DecoderBase):
             emb = self.embeddings(tgt, step=step, position=position)
 
         assert emb.dim() == 3  # len x batch x embedding_dim
-
         # [batch_size, tgt_len - 1, dim]
         output = emb.transpose(0, 1).contiguous()
+        tgt_path = kwargs.get('tgt_path', None)
+
+        if tgt_path is not None:
+            path_vec = self.path_embeddings(output.size(1), tgt_path)
+            output = output + path_vec
+
+
+
         # [batch_size, src_len, dim]
         src_memory_bank = memory_bank.transpose(0, 1).contiguous()
 

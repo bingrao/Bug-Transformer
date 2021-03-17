@@ -24,7 +24,7 @@ class MeanEncoder(EncoderBase):
             opt.enc_layers,
             embeddings)
 
-    def forward(self, src, lengths=None, position=None):
+    def forward(self, src, lengths=None, position=None, **kwargs):
         """See :func:`EncoderBase.forward()`"""
         self._check_args(src, lengths)
 

@@ -252,11 +252,17 @@ def preprocess_opts(parser):
     group.add('--train_src', '-train_src', required=True, nargs='+',
               help="Path(s) to the training source data")
 
+    group.add('--train_src_path', '-train_src_path', required=False, nargs='+',
+              help="Path(s) to the training source path data")
+
     group.add('--train_src_pos', '-train_src_pos', nargs='+',
               help="Path(s) to the training source position data")
 
     group.add('--train_tgt', '-train_tgt', required=True, nargs='+',
               help="Path(s) to the training target data")
+
+    group.add('--train_tgt_path', '-train_tgt_path', nargs='+',
+              help="Path(s) to the training target path data")
 
     group.add('--train_tgt_pos', '-train_tgt_pos', nargs='+',
               help="Path(s) to the training target position data")
@@ -270,10 +276,16 @@ def preprocess_opts(parser):
     group.add('--valid_src', '-valid_src',
               help="Path to the validation source data")
 
+    group.add('--valid_src_path', '-valid_src_path',
+              help="Path to the validation source data")
+
     group.add('--valid_src_pos', '-valid_src_pos',
               help="Path to the validation source position data")
 
     group.add('--valid_tgt', '-valid_tgt',
+              help="Path to the validation target data")
+
+    group.add('--valid_tgt_path', '-valid_tgt_path',
               help="Path to the validation target data")
 
     group.add('--valid_tgt_pos', '-valid_tgt_pos',
@@ -289,6 +301,10 @@ def preprocess_opts(parser):
               help="Output file for the prepared data")
 
     group.add('--pos_vec_size', '-pos_vec_size', type=int, default=256,
+              help="The position vector dimension size, which must match "
+                   "with the dimension of word vector size in train phase")
+
+    group.add('--path_vec_size', '-path_vec_size', type=int, default=256,
               help="The position vector dimension size, which must match "
                    "with the dimension of word vector size in train phase")
 

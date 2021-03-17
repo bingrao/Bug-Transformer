@@ -18,6 +18,7 @@ from onmt.inputters.image_dataset import image_fields
 from onmt.inputters.audio_dataset import audio_fields
 from onmt.inputters.vec_dataset import vec_fields
 from onmt.inputters.position_dataset import position_fields
+from onmt.inputters.path_dataset import path_fields
 from onmt.utils.logging import logger
 # backwards compatibility
 from onmt.inputters.text_dataset import _feature_tokenize  # noqa: F401
@@ -25,6 +26,7 @@ from onmt.inputters.image_dataset import (  # noqa: F401
     batch_img as make_img)
 
 import gc
+
 
 # monkey-patch to make torchtext Vocab's pickleable
 def _getstate(self):
@@ -100,17 +102,17 @@ def parse_align_idx(align_pharaoh):
 
 
 def get_fields(
-    src_data_type,
-    n_src_feats,
-    n_tgt_feats,
-    pad='<blank>',
-    bos='<s>',
-    eos='</s>',
-    dynamic_dict=False,
-    with_align=False,
-    src_truncate=None,
-    tgt_truncate=None,
-    opt=None
+        src_data_type,
+        n_src_feats,
+        n_tgt_feats,
+        pad='<blank>',
+        bos='<s>',
+        eos='</s>',
+        dynamic_dict=False,
+        with_align=False,
+        src_truncate=None,
+        tgt_truncate=None,
+        opt=None
 ):
     """
     Args:
@@ -150,7 +152,8 @@ def get_fields(
                       "audio": audio_fields,
                       "vec": vec_fields,
                       "position": position_fields,
-                      "code": text_fields}
+                      "code": text_fields,
+                      "path": path_fields}
 
     src_field_kwargs = {"n_feats": n_src_feats,
                         "include_lengths": True,
@@ -169,6 +172,15 @@ def get_fields(
                                 "base_name": "src_pos"}
         fields["src_pos"] = fields_getters["position"](**src_pos_field_kwargs)
 
+    if opt is not None and src_data_type == 'code' and (opt.train_src_path is not None or opt.valid_src_path is not None):
+        src_path_field_kwargs = {"n_feats": n_src_feats,
+                                 "include_lengths": True,
+                                 "pad": pad, "bos": bos, "eos": eos,
+                                 "path_vec_size": opt.path_vec_size,
+                                 "truncate": src_truncate,
+                                 "base_name": "src_path"}
+        fields["src_path"] = fields_getters["path"](**src_path_field_kwargs)
+
     tgt_field_kwargs = {"n_feats": n_tgt_feats,
                         "include_lengths": False,
                         "pad": pad, "bos": bos, "eos": eos,
@@ -180,7 +192,7 @@ def get_fields(
     else:
         fields["tgt"] = fields_getters["text"](**tgt_field_kwargs)
 
-    if opt is not None and (opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None):
+    if opt is not None and src_data_type == 'code' and (opt.train_tgt_pos is not None or opt.valid_tgt_pos is not None):
         tgt_pos_field_kwargs = {"n_feats": n_tgt_feats,
                                 "include_lengths": False,
                                 "pad": pad, "bos": bos, "eos": eos,
@@ -188,6 +200,15 @@ def get_fields(
                                 "pos_vec_size": opt.pos_vec_size,
                                 "base_name": "tgt_pos"}
         fields["tgt_pos"] = fields_getters["position"](**tgt_pos_field_kwargs)
+
+    if opt is not None and src_data_type == 'code' and (opt.train_tgt_path is not None or opt.valid_tgt_path is not None):
+        tgt_path_field_kwargs = {"n_feats": n_tgt_feats,
+                                 "include_lengths": False,
+                                 "pad": pad, "bos": bos, "eos": eos,
+                                 "truncate": tgt_truncate,
+                                 "path_vec_size": opt.path_vec_size,
+                                 "base_name": "tgt_path"}
+        fields["tgt_path"] = fields_getters["path"](**tgt_path_field_kwargs)
 
     indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
     fields["indices"] = indices
@@ -291,13 +312,13 @@ def _old_style_vocab(vocab):
     """
 
     return isinstance(vocab, list) and \
-        any(isinstance(v[1], Vocab) for v in vocab)
+           any(isinstance(v[1], Vocab) for v in vocab)
 
 
 def _old_style_nesting(vocab):
     """Detect old-style nesting (``dict[str, List[Tuple[str, Field]]]``)."""
     return isinstance(vocab, dict) and \
-        any(isinstance(v, list) for v in vocab.values())
+           any(isinstance(v, list) for v in vocab.values())
 
 
 def _old_style_field_list(vocab):
@@ -316,13 +337,13 @@ def _old_style_field_list(vocab):
 
     # if tgt isn't using TextMultiField, then no text field is.
     return (not _old_style_vocab(vocab)) and _old_style_nesting(vocab) and \
-        (not isinstance(vocab['tgt'][0][1], TextMultiField))
+           (not isinstance(vocab['tgt'][0][1], TextMultiField))
 
 
 def old_style_vocab(vocab):
     """The vocab/fields need updated."""
     return _old_style_vocab(vocab) or _old_style_field_list(vocab) or \
-        _old_style_nesting(vocab)
+           _old_style_nesting(vocab)
 
 
 def filter_example(ex, use_src_len=True, use_tgt_len=True,
@@ -350,7 +371,7 @@ def filter_example(ex, use_src_len=True, use_tgt_len=True,
     src_len = len(ex.src[0])
     tgt_len = len(ex.tgt[0])
     return (not use_src_len or min_src_len <= src_len <= max_src_len) and \
-        (not use_tgt_len or min_tgt_len <= tgt_len <= max_tgt_len)
+           (not use_tgt_len or min_tgt_len <= tgt_len <= max_tgt_len)
 
 
 def _pad_vocab_to_multiple(vocab, multiple):
@@ -405,16 +426,26 @@ def _build_fields_vocab(fields, counters, data_type, share_vocab,
                         subword_prefix="▁",
                         subword_prefix_is_joiner=False):
     build_fv_args = defaultdict(dict)
-    build_fv_args["src"] = dict(
-        max_size=src_vocab_size, min_freq=src_words_min_frequency)
-    build_fv_args["tgt"] = dict(
-        max_size=tgt_vocab_size, min_freq=tgt_words_min_frequency)
+    build_fv_args["src"] = dict(max_size=src_vocab_size, min_freq=src_words_min_frequency)
+    build_fv_args["tgt"] = dict(max_size=tgt_vocab_size, min_freq=tgt_words_min_frequency)
+
     tgt_multifield = fields["tgt"]
     _build_fv_from_multifield(
         tgt_multifield,
         counters,
         build_fv_args,
         size_multiple=vocab_size_multiple if not share_vocab else 1)
+
+    if 'tgt_path' in fields:
+        build_fv_args["tgt_path"] = dict(max_size=src_vocab_size, min_freq=src_words_min_frequency)
+        tgt_path_multifield = fields["tgt_path"]
+        _build_fv_from_multifield(
+            tgt_path_multifield,
+            counters,
+            build_fv_args,
+            size_multiple=vocab_size_multiple if not share_vocab else 1)
+    else:
+        tgt_path_multifield = None
 
     if fields.get("corpus_id", False):
         fields["corpus_id"].vocab = fields["corpus_id"].vocab_cls(counters["corpus_id"])
@@ -427,6 +458,17 @@ def _build_fields_vocab(fields, counters, data_type, share_vocab,
             build_fv_args,
             size_multiple=vocab_size_multiple if not share_vocab else 1)
 
+        if 'src_path' in fields:
+            build_fv_args["src_path"] = dict(max_size=src_vocab_size, min_freq=src_words_min_frequency)
+            src_path_multifield = fields["src_path"]
+            _build_fv_from_multifield(
+                src_path_multifield,
+                counters,
+                build_fv_args,
+                size_multiple=vocab_size_multiple if not share_vocab else 1)
+        else:
+            src_path_multifield = None
+
         if share_vocab:
             # `tgt_vocab_size` is ignored when sharing vocabularies
             logger.info(" * merging src and tgt vocab...")
@@ -437,6 +479,16 @@ def _build_fields_vocab(fields, counters, data_type, share_vocab,
                 min_freq=src_words_min_frequency,
                 vocab_size_multiple=vocab_size_multiple)
             logger.info(" * merged vocab size: %d." % len(src_field.vocab))
+
+            if src_path_multifield and tgt_path_multifield:
+                logger.info(" * merging src and tgt path vocab...")
+                src_path_field = src_path_multifield.base_field
+                tgt_path_field = tgt_path_multifield.base_field
+                _merge_field_vocabs(
+                    src_path_field, tgt_path_field, vocab_size=src_vocab_size,
+                    min_freq=src_words_min_frequency,
+                    vocab_size_multiple=vocab_size_multiple)
+                logger.info(" * merged path vocab size: %d." % len(src_path_field.vocab))
 
         build_noise_field(
             src_multifield.base_field,
@@ -453,10 +505,13 @@ def build_noise_field(src_field, subword=True,
          - end_of_sentence
     """
     if subword:
-        def is_word_start(x): return (x.startswith(subword_prefix) ^ is_joiner)
+        def is_word_start(x):
+            return (x.startswith(subword_prefix) ^ is_joiner)
+
         sentence_breaks = [subword_prefix + t for t in sentence_breaks]
     else:
-        def is_word_start(x): return True
+        def is_word_start(x):
+            return True
 
     vocab_size = len(src_field.vocab)
     word_start_mask = torch.zeros([vocab_size]).bool()
@@ -623,7 +678,7 @@ def batch_iter(data, batch_size, batch_size_fn=None, batch_size_multiple=1):
                 overflowed += 1
             if batch_size_multiple > 1:
                 overflowed += (
-                    (len(minibatch) - overflowed) % batch_size_multiple)
+                        (len(minibatch) - overflowed) % batch_size_multiple)
             if overflowed == 0:
                 yield minibatch
                 minibatch, size_so_far = [], 0
@@ -722,10 +777,7 @@ class OrderedIterator(torchtext.data.Iterator):
                 if self.yield_raw_example:
                     yield minibatch[0]
                 else:
-                    yield torchtext.data.Batch(
-                        minibatch,
-                        self.dataset,
-                        self.device)
+                    yield torchtext.data.Batch(minibatch, self.dataset, self.device)
             if not self.repeat:
                 return
 
@@ -735,6 +787,7 @@ class MultipleDatasetIterator(object):
     This takes a list of iterable objects (DatasetLazyIter) and their
     respective weights, and yields a batch in the wanted proportions.
     """
+
     def __init__(self,
                  train_shards,
                  fields,
@@ -860,7 +913,7 @@ class DatasetLazyIter(object):
                 yield batch
                 num_batches += 1
         if self.is_train and not self.repeat and \
-           num_batches % self.num_batches_multiple != 0:
+                num_batches % self.num_batches_multiple != 0:
             # When the dataset is not repeated, we might need to ensure that
             # the number of returned batches is the multiple of a given value.
             # This is important for multi GPU training to ensure that all

@@ -130,7 +130,9 @@ function _abstract() {
   OutputFixedDir=$(cat "${ConfigFile}" | grep -e "output_dir" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
 
   OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
+  OutputBuggyPathFile=${OutputBuggyDir}/total/buggy_path.txt
   OutputFixedFile=${OutputFixedDir}/total/fixed.txt
+  OutputFixedPathFile=${OutputFixedDir}/total/fixed_path.txt
 
   logInfo "Check ${OutputBuggyFile} if exist"
   [ -f "${OutputBuggyFile}" ] || exit 1
@@ -154,24 +156,34 @@ function _abstract() {
   "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}" | tee -a "${LogFile}"
 
   split -l "${train_cnt}" "${OutputBuggyFile}" train-buggy
+  split -l "${train_cnt}" "${OutputBuggyPathFile}" train-buggy-path
   split -l "${train_cnt}" "${OutputFixedFile}" train-fixed
+  split -l "${train_cnt}" "${OutputFixedPathFile}" train-fixed-path
   mv ./train-buggyaa "${OutputBuggyDir}"/train-buggy.txt
+  mv ./train-buggy-pathaa "${OutputBuggyDir}"/train-buggy-path.txt
   mv ./train-fixedaa "${OutputFixedDir}"/train-fixed.txt
+  mv ./train-fixed-pathaa "${OutputFixedDir}"/train-fixed-path.txt
 
   logInfo "BLUE value <train-buggy.txt, train-fixed.txt>, count: ${train_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt | tee -a "${LogFile}"
 
   split -l "${eval_cnt}" ./train-buggyab eval-buggy; rm -fr train-buggyab
+  split -l "${eval_cnt}" ./train-buggy-pathab eval-buggy-path; rm -fr train-buggy-pathab
   split -l "${eval_cnt}" ./train-fixedab eval-fixed; rm -fr train-fixedab
+  split -l "${eval_cnt}" ./train-fixed-pathab eval-fixed-path; rm -fr train-fixed-pathab
 
   mv ./eval-buggyaa "${OutputBuggyDir}"/eval-buggy.txt
+  mv ./eval-buggy-pathaa "${OutputBuggyDir}"/eval-buggy-path.txt
   mv ./eval-fixedaa "${OutputFixedDir}"/eval-fixed.txt
+  mv ./eval-fixed-pathaa "${OutputFixedDir}"/eval-fixed-path.txt
 
   logInfo "BLUE value <eval-buggy.txt, eval-fixed.txt>, count: ${eval_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt | tee -a "${LogFile}"
 
   mv ./eval-buggyab "${OutputBuggyDir}"/test-buggy.txt
+  mv ./eval-buggy-pathab "${OutputBuggyDir}"/test-buggy-path.txt
   mv ./eval-fixedab "${OutputFixedDir}"/test-fixed.txt
+  mv ./eval-fixed-pathab "${OutputFixedDir}"/test-fixed-path.txt
   logInfo "BLUE value <test-buggy.txt, test-fixed.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt | tee -a "${LogFile}"
 }
@@ -422,8 +434,8 @@ function _inference() {
   TranslateBestRatio=1.0
 
   logInfo "------------------- Inference Search ------------------------"
-#  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
-  beam_widths=("45" "50")
+  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
+#  beam_widths=("45" "50")
   for beam_width in ${beam_widths[*]}
   do
     _translate "${beam_width}" "${beam_width}" "${TranslateBestRatio}"

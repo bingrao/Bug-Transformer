@@ -30,7 +30,7 @@ train:
 
 
   decoder_type: transformer
-  encoder_type: transformer
+  encoder_type: rnn
   word_vec_size: 512
   rnn_size: 512
   layers: 6
@@ -76,13 +76,13 @@ train:
 
 translate:
   work_model: translate
-#  model: examples/learning_fix/data/small/10/small-step-132000-acc-95.46-ppl-1.17-xent-0.16.pt
+  model: examples/learning_fix/data/small/2/small-step-105000-acc-96.16-ppl-1.15-xent-0.14.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
   max_length: 100
-  batch_size: 16
+  batch_size: 8
   gpu: 0
 #  report_align: 'true'

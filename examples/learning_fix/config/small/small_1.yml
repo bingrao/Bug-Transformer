@@ -1,9 +1,17 @@
 preprocess:
   work_model: preprocess
+
   train_src: examples/learning_fix/data/small/train-buggy.txt
+  train_src_path: examples/learning_fix/data/small/train-buggy-path.txt
   train_tgt: examples/learning_fix/data/small/train-fixed.txt
+  train_tgt_path: examples/learning_fix/data/small/train-fixed-path.txt
+
+
   valid_src: examples/learning_fix/data/small/eval-buggy.txt
+  valid_src_path: examples/learning_fix/data/small/eval-buggy-path.txt
   valid_tgt: examples/learning_fix/data/small/eval-fixed.txt
+  valid_tgt_path: examples/learning_fix/data/small/eval-fixed-path.txt
+
   save_data: examples/learning_fix/data/small/small
   src_seq_length: 46680
   tgt_seq_length: 46680
@@ -18,11 +26,11 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  train_from: examples/learning_fix/data/small/1/small-step-100000-acc-95.04-ppl-1.19-xent-0.18.pt
+#  train_from: examples/learning_fix/data/small/1/small-step-100000-acc-95.04-ppl-1.19-xent-0.18.pt
   save_checkpoint_steps: 2000
   keep_checkpoint: 1000
   seed: 3435
-  train_steps: 300000
+  train_steps: 100000
   valid_steps: 5000
   early_stopping: 10
   warmup_steps: 4000
@@ -58,10 +66,9 @@ train:
   position_encoding: 'true'
 
   master_port: 8001
-  world_size: 2
+  world_size: 1
   gpu_ranks:
     - 0
-    - 1
 
 translate:
   work_model: translate

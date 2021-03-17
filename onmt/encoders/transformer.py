@@ -8,6 +8,8 @@ from onmt.encoders.encoder import EncoderBase
 from onmt.modules import MultiHeadedAttention
 from onmt.modules.position_ffn import PositionwiseFeedForward
 from onmt.utils.misc import sequence_mask
+from onmt.modules.embeddings import PathEmbeddings
+import torch
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -93,6 +95,10 @@ class TransformerEncoder(EncoderBase):
         super(TransformerEncoder, self).__init__()
 
         self.embeddings = embeddings
+
+        self.path_embeddings = PathEmbeddings(512, d_model)
+        # self.path_lstm = nn.LSTM(d_model, d_model)
+
         self.transformer = nn.ModuleList(
             [TransformerEncoderLayer(
                 d_model, heads, d_ff, dropout, attention_dropout,
@@ -114,14 +120,21 @@ class TransformerEncoder(EncoderBase):
             embeddings,
             opt.max_relative_positions)
 
-    def forward(self, src, lengths=None, position=None):
+    def forward(self, src, lengths=None, position=None, **kwargs):
         """See :func:`EncoderBase.forward()`"""
         self._check_args(src, lengths)
 
         emb = self.embeddings(src, step=None, position=position)
-
         out = emb.transpose(0, 1).contiguous()
         mask = ~sequence_mask(lengths).unsqueeze(1)
+
+        src_path = kwargs.get('src_path', None)
+
+        if src_path is not None:
+            path_vec = self.path_embeddings(out.size(1), src_path)
+            out = out + path_vec
+
+
         # Run the forward pass of every layer of the tranformer.
         for layer in self.transformer:
             out = layer(out, mask)

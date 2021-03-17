@@ -36,7 +36,7 @@ class EnsembleEncoder(EncoderBase):
         super(EnsembleEncoder, self).__init__()
         self.model_encoders = nn.ModuleList(model_encoders)
 
-    def forward(self, src, lengths=None):
+    def forward(self, src, lengths=None, **kwargs):
         enc_hidden, memory_bank, _ = zip(*[
             model_encoder(src, lengths)
             for model_encoder in self.model_encoders])
@@ -51,8 +51,7 @@ class EnsembleDecoder(DecoderBase):
         super(EnsembleDecoder, self).__init__(attentional)
         self.model_decoders = model_decoders
 
-    def forward(self, tgt, memory_bank, memory_lengths=None, step=None,
-                **kwargs):
+    def forward(self, tgt, memory_bank, memory_lengths=None, step=None, **kwargs):
         """See :func:`onmt.decoders.decoder.DecoderBase.forward()`."""
         # Memory_lengths is a single tensor shared between all models.
         # This assumption will not hold if Translator is modified
@@ -93,7 +92,7 @@ class EnsembleGenerator(nn.Module):
         self.model_generators = nn.ModuleList(model_generators)
         self._raw_probs = raw_probs
 
-    def forward(self, hidden, attn=None, src_map=None):
+    def forward(self, hidden, attn=None, src_map=None, **kwargs):
         """
         Compute a distribution over the target dictionary
         by averaging distributions from models in the ensemble.

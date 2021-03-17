@@ -412,19 +412,27 @@ class Trainer(object):
 
             batch = self.maybe_noise_source(batch)
             # src: [src_len, batch_size, 1] e.g. torch.Size([42, 83, 1])
-            src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                else (batch.src, None)
+            src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
             if src_lengths is not None:
                 report_stats.n_src_words += src_lengths.sum().item()
 
             tgt_outer = batch.tgt
 
-            if self.position_encoding and self.position_style != "index":
+            # if self.position_encoding and self.position_style != "index":
+            if hasattr(batch, 'src_pos') and hasattr(batch, 'tgt_pos'):
                 src_pos = batch.src_pos
                 tgt_pos = batch.tgt_pos
             else:
                 src_pos = None
                 tgt_pos = None
+
+            if hasattr(batch, 'src_path') and hasattr(batch, 'tgt_path'):
+                src_path = batch.src_path
+                tgt_path = batch.tgt_path
+            else:
+                src_path = None
+                tgt_path = None
+
 
             bptt = False
             for j in range(0, target_size - 1, trunc_size):
@@ -439,14 +447,14 @@ class Trainer(object):
                     outputs, attns = self.schedule_samples_model(src, tgt, src_lengths, target_size,
                                                                  src_pos, tgt_pos, batch.batch_size, bptt, step)
                 else:
-                    new_tgt = torch.zeros(tgt.shape).type_as(tgt.data)
-                    if tgt.size(0) >= src.size(0):
-                        new_tgt[:src.size(0), :, :] = src
-                    else:
-                        new_tgt = src[:tgt.size(0), :, :]
-
-                    outputs, attns = self.model(src, new_tgt, src_lengths, bptt=bptt,
-                                                with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
+                    # new_tgt = torch.zeros(tgt.shape).type_as(tgt.data)
+                    # if tgt.size(0) >= src.size(0):
+                    #     new_tgt[:src.size(0), :, :] = src
+                    # else:
+                    #     new_tgt = src[:tgt.size(0), :, :]
+                    outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt, with_align=self.with_align,
+                                                src_pos=src_pos, tgt_pos=tgt_pos,
+                                                src_path=src_path, tgt_path=tgt_path)
                 bptt = True
 
                 # 3. Compute loss.

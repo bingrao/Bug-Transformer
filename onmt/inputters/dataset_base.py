@@ -107,8 +107,7 @@ class Dataset(TorchtextDataset):
             predict to copy them.
     """
 
-    def __init__(self, fields, readers, data, dirs, sort_key,
-                 filter_pred=None, corpus_id=None):
+    def __init__(self, fields, readers, data, dirs, sort_key, filter_pred=None, corpus_id=None):
         self.sort_key = sort_key
         can_copy = 'src_map' in fields and 'alignment' in fields
 
@@ -142,7 +141,50 @@ class Dataset(TorchtextDataset):
                        [108,4,12,21,30,38,46,55,65,73,84,95,102] [108,0,12,21,30,38,46,55,65,73,84,95,102] 
                        [108,2,13,22,31,39,47,56,66,74,85,96,103] [108,1,12,21,29,37,46,56,64,75,86,93] 
                        [108,6,11,20,30,38,49,60,67] [108,1,13,23,31,42,53,60] [108,1,15,26,33]'
-             
+             src_path: 'public @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ Modifier | 
+                        java.util.List @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ ClassOrInterfaceType | 
+                        < @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ ClassOrInterfaceType | 
+                        TYPE1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ ClassOrInterfaceType ↑ ClassOrInterfaceType | 
+                        > @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ ClassOrInterfaceType | 
+                        METHOD1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration | 
+                        ( @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration | 
+                        ) @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration | 
+                        { @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt | 
+                        java.util.ArrayList @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ClassOrInterfaceType | 
+                        < @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ClassOrInterfaceType | 
+                        TYPE1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ClassOrInterfaceType ↑ ClassOrInterfaceType | 
+                        > @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ClassOrInterfaceType | 
+                        VAR1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator | 
+                        = @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator | 
+                        new @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ObjectCreationExpr | 
+                        java.util.ArrayList @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ObjectCreationExpr ↑ ClassOrInterfaceType | 
+                        < @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ObjectCreationExpr ↑ ClassOrInterfaceType | 
+                        TYPE1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ObjectCreationExpr ↑ ClassOrInterfaceType ↑ ClassOrInterfaceType | 
+                        > @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ObjectCreationExpr ↑ ClassOrInterfaceType | ( @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ObjectCreationExpr | 
+                        ) @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ObjectCreationExpr | 
+                        ; @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ExpressionStmt | 
+                        for @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt | 
+                        ( @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt | 
+                        TYPE2 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ClassOrInterfaceType | 
+                        . @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ClassOrInterfaceType | 
+                        TYPE3 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator ↑ ClassOrInterfaceType | 
+                        VAR2 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ VariableDeclarationExpr ↑ VariableDeclarator | 
+                        : @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt | 
+                        IDENT1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ NameExpr | 
+                        ) @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt | 
+                        { @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt | 
+                        VAR1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr ↑ NameExpr | 
+                        . @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr | 
+                        METHOD2 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr | 
+                        ( @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr | 
+                        VAR2 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr ↑ MethodCallExpr ↑ NameExpr | 
+                        . @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr ↑ MethodCallExpr | 
+                        METHOD1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr ↑ MethodCallExpr | 
+                        ( @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr ↑ MethodCallExpr | 
+                        ) @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr ↑ MethodCallExpr | 
+                        ) @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt ↑ MethodCallExpr | 
+                        ; @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt ↑ ExpressionStmt | 
+                        } @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ForEachStmt ↑ BlockStmt | return @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ReturnStmt | VAR1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ReturnStmt ↑ NameExpr | ; @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ReturnStmt | } @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt\n'
              tgt_pos: '[74,3,15,22] [74,5,15,22] [74,4,15,22] [74,0,15,22] [74,2,16,23] [74,0,15,26,33] 
                        [74,3,12,21,28,41,52,59] [74,0,12,20,32,43,50] [74,4,13,21,33,44,51] [74,0,13,21,33,44,51] 
                        [74,3,12,21,29,41,52,59] [74,2,14,22,34,45,52] [74,6,11,23,34,41] [74,3,10,19,26,39,50,57] 
@@ -150,7 +192,20 @@ class Dataset(TorchtextDataset):
                        [74,2,14,21,34,45,52] [74,6,10,23,34,41] [74,3,10,19,26,39,50,57] [74,0,12,21,32,43,50] 
                        [74,4,13,22,33,44,51] [74,0,13,22,33,44,51] [74,1,13,22,31,42,53,60] [74,4,11,22,31,40,51,62,69] 
                        [74,2,14,23,32,43,54,61] [74,8,15,24,33,44,55,62] [74,2,14,23,34,45,52] [74,6,12,23,34,41] 
-                       [74,1,16,27,34]'
+                       [74,1,16,27,34]' 
+             tgt_path: 'public @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ Modifier | 
+                        java.util.List @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ ClassOrInterfaceType | 
+                        < @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ ClassOrInterfaceType | 
+                        TYPE1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ ClassOrInterfaceType ↑ ClassOrInterfaceType | 
+                        > @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ ClassOrInterfaceType | 
+                        METHOD1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration | 
+                        ( @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration | 
+                        ) @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration | 
+                        { @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt | 
+                        return @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ReturnStmt | 
+                        VAR1 @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ReturnStmt ↑ NameExpr | 
+                        ; @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt ↑ ReturnStmt | 
+                        } @ CompilationUnit ↑ ClassOrInterfaceDeclaration ↑ MethodDeclaration ↑ BlockStmt\n'
             } 
             """
             if corpus_id is not None:

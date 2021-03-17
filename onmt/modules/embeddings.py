@@ -291,3 +291,30 @@ class Embeddings(nn.Module):
     def update_dropout(self, dropout):
         if self.position_encoding:
             self.pe.dropout.p = dropout
+
+
+
+class PathEmbeddings(nn.Module):
+    def __init__(self, node_vocab, d_model):
+        super(PathEmbeddings, self).__init__()
+        self.d_model = d_model
+        self.embeddings = nn.Embedding(node_vocab, d_model)
+        self.lstm = nn.LSTM(d_model, d_model)
+
+
+    def forward(self, x, path):
+        x_path, x_length = path
+        node_embedding = self.embeddings(x_path)
+        path_out, _ = self.lstm(node_embedding, None)
+        path_out = path_out.sum(dim=1)
+        st = 0
+        stack = []
+        for leng in x_length:
+            seq_path = path_out[st:st + leng, :]
+            if x > leng:
+                seq_path = torch.cat([seq_path, torch.zeros((x - leng, self.d_model)).type_as(seq_path)], dim=0)
+            stack.append(seq_path)
+            st += leng
+        path_vec = torch.stack(stack)
+
+        return path_vec

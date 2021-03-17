@@ -12,18 +12,19 @@ from onmt.inputters.image_dataset import img_sort_key, ImageDataReader
 from onmt.inputters.audio_dataset import audio_sort_key, AudioDataReader
 from onmt.inputters.vec_dataset import vec_sort_key, VecDataReader
 from onmt.inputters.position_dataset import position_sort_key, PositionDataReader
+from onmt.inputters.path_dataset import path_sort_key, PathDataReader
 from onmt.inputters.datareader_base import DataReaderBase
 
 str2reader = {
     "text": TextDataReader, "img": ImageDataReader, "audio": AudioDataReader,
-    "vec": VecDataReader, "position": PositionDataReader, "code": TextDataReader}
+    "vec": VecDataReader, "position": PositionDataReader, "code": TextDataReader, "path": PathDataReader}
 str2sortkey = {
     'text': text_sort_key, 'img': img_sort_key, 'audio': audio_sort_key,
-    'vec': vec_sort_key, "position": position_sort_key, "code": text_sort_key}
+    'vec': vec_sort_key, "position": position_sort_key, "code": text_sort_key, "path": path_sort_key}
 
 
 __all__ = ['Dataset', 'load_old_vocab', 'get_fields', 'DataReaderBase',
            'filter_example', 'old_style_vocab',
            'build_vocab', 'OrderedIterator',
-           'text_sort_key', 'img_sort_key', 'audio_sort_key', 'vec_sort_key', 'position_sort_key',
-           'TextDataReader', 'ImageDataReader', 'AudioDataReader', 'VecDataReader', 'PositionDataReader']
+           'text_sort_key', 'img_sort_key', 'audio_sort_key', 'vec_sort_key', 'position_sort_key', 'path_sort_key',
+           'TextDataReader', 'ImageDataReader', 'AudioDataReader', 'VecDataReader', 'PositionDataReader', 'PathDataReader']
