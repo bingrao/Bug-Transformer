@@ -374,13 +374,31 @@ class Trainer(object):
                 src, src_lengths = batch.src if isinstance(batch.src, tuple) \
                     else (batch.src, None)
                 tgt = batch.tgt
+
                 if self.external_evaluators != 'none':
                     translator = SimpleGreedySearch(self.model, valid_iter, self.external_evaluators)
                     metric_scores.update(translator.batch_bleu_score(batch))
                     # all_bleu_scores += [translator.batch_bleu_score(batch)['bleu']]
 
+                # if self.position_encoding and self.position_style != "index":
+                if self.position_encoding and hasattr(batch, 'src_pos') and hasattr(batch, 'tgt_pos'):
+                    src_pos = batch.src_pos
+                    tgt_pos = batch.tgt_pos
+                else:
+                    src_pos = None
+                    tgt_pos = None
+
+                if self.path_encoding and hasattr(batch, 'src_path') and hasattr(batch, 'tgt_path'):
+                    src_path = batch.src_path
+                    tgt_path = batch.tgt_path
+                else:
+                    src_path = None
+                    tgt_path = None
+
                 # F-prop through the model.
-                outputs, attns = valid_model(src, tgt, src_lengths, with_align=self.with_align)
+                outputs, attns = valid_model(src, tgt, src_lengths, with_align=self.with_align,
+                                             src_pos=src_pos, tgt_pos=tgt_pos,
+                                             src_path=src_path, tgt_path=tgt_path)
 
                 # Compute loss.
                 _, batch_stats = self.valid_loss(batch, outputs, attns)
