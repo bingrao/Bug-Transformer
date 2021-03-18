@@ -1,9 +1,17 @@
 preprocess:
   work_model: preprocess
+
   train_src: examples/learning_fix/data/small/train-buggy.txt
+  train_src_path: examples/learning_fix/data/small/train-buggy-path.txt
   train_tgt: examples/learning_fix/data/small/train-fixed.txt
+  train_tgt_path: examples/learning_fix/data/small/train-fixed-path.txt
+
+
   valid_src: examples/learning_fix/data/small/eval-buggy.txt
+  valid_src_path: examples/learning_fix/data/small/eval-buggy-path.txt
   valid_tgt: examples/learning_fix/data/small/eval-fixed.txt
+  valid_tgt_path: examples/learning_fix/data/small/eval-fixed-path.txt
+
   save_data: examples/learning_fix/data/small/small
   src_seq_length: 46680
   tgt_seq_length: 46680
@@ -18,11 +26,10 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-#  train_from: examples/learning_fix/data/small/2/small-step-100000-acc-95.04-ppl-1.19-xent-0.18.pt
   save_checkpoint_steps: 5000
   keep_checkpoint: 1000
   seed: 3435
-  train_steps: 200000
+  train_steps: 100000
   valid_steps: 5000
   early_stopping: 10
   warmup_steps: 4000
@@ -33,8 +40,7 @@ train:
   encoder_type: transformer
   word_vec_size: 512
   rnn_size: 512
-  enc_layers: 6
-  dec_layers: 4
+  layers: 6
   transformer_ff: 2048
   heads: 8
 
@@ -46,10 +52,10 @@ train:
   learning_rate: 0.01
   max_grad_norm: 5
 
-  batch_size: 4096
+  batch_size: 2048
   batch_type: tokens
   normalization: tokens
-  dropout: 0.2
+  dropout: 0.1
   label_smoothing: 0.1
 
   max_generator_batches: 2
@@ -57,27 +63,25 @@ train:
   param_init: 0.0
   param_init_glorot: 'true'
   position_encoding: 'true'
+  path_encoding: 'true'
 
 
-  sampling_type: "scheduled"
-  mixture_type: "all_teacher_suggesting"
-  transformer_scheduled_activation: "gumbel"
-  scheduled_sampling_decay: "sigmoid"
-  scheduled_sampling_k: 10000
-  transformer_scheduled_alpha: 0.5
-  external_evaluators: 'bleu'
 
   master_port: 8003
-  world_size: 2
+  world_size: 4
   gpu_ranks:
     - 0
     - 1
+    - 2
+    - 3
 
 translate:
   work_model: translate
-#  model: examples/learning_fix/data/small/10/small-step-132000-acc-95.46-ppl-1.17-xent-0.16.pt
+#  model: examples/learning_fix/data/small/2/small-step-105000-acc-96.16-ppl-1.15-xent-0.14.pt
   src: examples/learning_fix/data/small/test-buggy.txt
+  src_path: examples/learning_fix/data/small/test-buggy-path.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
+  tgt_path: examples/learning_fix/data/small/test-fixed-path.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
