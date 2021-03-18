@@ -52,7 +52,7 @@ train:
   learning_rate: 0.01
   max_grad_norm: 5
 
-  batch_size: 2048
+  batch_size: 4096
   batch_type: tokens
   normalization: tokens
   dropout: 0.1
