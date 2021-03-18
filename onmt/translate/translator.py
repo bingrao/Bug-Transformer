@@ -130,7 +130,9 @@ class Translator(object):
             report_align=False,
             report_score=True,
             logger=None,
-            seed=-1):
+            seed=-1,
+            **kwargs):
+
         self.model = model
         self.fields = fields
         tgt_field = dict(self.fields)["tgt"].base_field
@@ -143,8 +145,7 @@ class Translator(object):
 
         self._gpu = gpu
         self._use_cuda = gpu > -1
-        self._dev = torch.device("cuda", self._gpu) \
-            if self._use_cuda else torch.device("cpu")
+        self._dev = torch.device("cuda", self._gpu) if self._use_cuda else torch.device("cpu")
 
         self.n_best = n_best
         self.max_length = max_length
@@ -163,6 +164,10 @@ class Translator(object):
             self._tgt_vocab.stoi[t] for t in self.ignore_when_blocking}
         self.src_reader = src_reader
         self.tgt_reader = tgt_reader
+
+        self.tgt_path_reader = kwargs.get('tgt_path_reader', None)
+        self.src_path_reader = kwargs.get('src_path_reader', None)
+
         self.replace_unk = replace_unk
         if self.replace_unk and not self.model.decoder.attentional:
             raise ValueError(
@@ -235,6 +240,13 @@ class Translator(object):
             tgt_reader = inputters.str2reader["code"].from_opt(opt)
         else:
             tgt_reader = inputters.str2reader["text"].from_opt(opt)
+
+        if opt.src_path is not None and opt.tgt_path is not None:
+            src_path_reader = inputters.str2reader['path'].from_opt(opt)
+            tgt_path_reader = inputters.str2reader['path'].from_opt(opt)
+        else:
+            src_path_reader, tgt_path_reader = None, None
+
         return cls(
             model,
             fields,
@@ -263,7 +275,9 @@ class Translator(object):
             report_align=report_align,
             report_score=report_score,
             logger=logger,
-            seed=opt.seed)
+            seed=opt.seed,
+            src_path_reader=src_path_reader,
+            tgt_path_reader=tgt_path_reader)
 
     def _log(self, msg):
         if self.logger:
@@ -291,7 +305,8 @@ class Translator(object):
             batch_type="sents",
             attn_debug=False,
             align_debug=False,
-            phrase_table=""):
+            phrase_table="",
+            **kwargs):
         """Translate content of ``src`` and get gold scores from ``tgt``.
 
         Args:
@@ -316,10 +331,22 @@ class Translator(object):
         if batch_size is None:
             raise ValueError("batch_size must be set")
 
+        src_path = kwargs.get('src_path', None)
+        tgt_path = kwargs.get('tgt_path', None)
+
         src_data = {"reader": self.src_reader, "data": src, "dir": src_dir}
         tgt_data = {"reader": self.tgt_reader, "data": tgt, "dir": None}
-        _readers, _data, _dir = inputters.Dataset.config(
-            [('src', src_data), ('tgt', tgt_data)])
+        dataset_config = [('src', src_data), ('tgt', tgt_data)]
+
+        if src_path is not None and self.src_path_reader is not None:
+            src_path_data = {"reader": self.src_path_reader, "data": src_path, "dir": None}
+            dataset_config.append(('src_path', src_path_data))
+
+        if tgt_path is not None and self.tgt_path_reader is not None:
+            tgt_path_data = {"reader": self.tgt_path_reader, "data": tgt_path, "dir": None}
+            dataset_config.append(('tgt_path', tgt_path_data))
+
+        _readers, _data, _dir = inputters.Dataset.config(dataset_config)
 
         # corpus_id field is useless here
         if self.fields.get("corpus_id", None) is not None:
@@ -555,7 +582,13 @@ class Translator(object):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) \
             else (batch.src, None)
 
-        enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths)
+        if hasattr(batch, 'src_path'):
+            src_path, src_path_lengths = batch.src_path if isinstance(batch.src_path, tuple) else (batch.src_path, None)
+        else:
+            src_path, src_path_lengths = None, None
+
+        enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths, src_path=src_path)
+
         if src_lengths is None:
             assert not isinstance(memory_bank, tuple), \
                 'Ensemble decoding only supported for text data'

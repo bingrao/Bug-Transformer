@@ -23,6 +23,7 @@ import time
 from onmt.utils.statistics import VocabularyStats
 from onmt.inputters import PositionDataReader, PathDataReader
 
+
 def check_existing_pt_files(opt, corpus_type, ids, existing_fields):
     """ Check if there are existing .pt files to avoid overwriting them """
     existing_shards = []
@@ -65,7 +66,6 @@ def process_one_shard(corpus_params, params):
             shard_type = "code"
     else:
         shard_type = "code"
-
 
     i, (src_shard, tgt_shard, align_shard, maybe_id, filter_pred, _src_shard, _tgt_shard) = params
     # create one counter per shard

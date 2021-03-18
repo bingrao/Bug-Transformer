@@ -772,10 +772,16 @@ def translate_opts(parser):
     group.add('--src', '-src', required=True,
               help="Source sequence to decode (one line per "
                    "sequence)")
+    group.add('--src_path', '-src_path', required=False,
+              help="Source sequence to decode (one line per "
+                   "sequence)")
     group.add('--src_dir', '-src_dir', default="",
               help='Source directory for image or audio files')
     group.add('--tgt', '-tgt',
               help='True target sequence (optional)')
+    group.add('--tgt_path', '-tgt_path',
+              help='True target sequence (optional)')
+    
     group.add('--shard_size', '-shard_size', type=int, default=10000,
               help="Divide src and tgt (if applicable) into "
                    "smaller multiple src and tgt files, then "
