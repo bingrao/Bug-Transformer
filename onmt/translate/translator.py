@@ -583,9 +583,9 @@ class Translator(object):
             else (batch.src, None)
 
         if hasattr(batch, 'src_path'):
-            src_path, src_path_lengths = batch.src_path if isinstance(batch.src_path, tuple) else (batch.src_path, None)
+            src_path = batch.src_path
         else:
-            src_path, src_path_lengths = None, None
+            src_path = None
 
         enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths, src_path=src_path)
 
