@@ -18,6 +18,7 @@ from onmt.modules.util_class import Cast
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
+from onmt.modules.embeddings import PathEmbeddings
 
 
 def build_embeddings(opt, text_field, for_encoder=True):
@@ -173,8 +174,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     if model_opt.path_encoding:
         from onmt.decoders.decoder import PathRNNDecoder
         from onmt.encoders.rnn_encoder import PathRNNEncoder
-        path_encoder = PathRNNEncoder.from_opt(model_opt)
-        path_decoder = PathRNNDecoder.from_opt(model_opt)
+        path_encoder = PathRNNEncoder.from_opt(model_opt, PathEmbeddings(model_opt, fields["src_path"]))
+        path_decoder = PathRNNDecoder.from_opt(model_opt, PathEmbeddings(model_opt, fields["tgt_path"]))
     else:
         path_encoder = None
         path_decoder = None

@@ -702,10 +702,10 @@ class PathRNNDecoder(RNNDecoderBase):
         return self.embeddings.embedding_size
 
     @classmethod
-    def from_opt(cls, opt):
+    def from_opt(cls, opt, embeddings):
         """Alternate constructor."""
-        embeddings = nn.Embedding(512, opt.dec_rnn_size)
-        embeddings.embedding_size = opt.dec_rnn_size
+        # embeddings = nn.Embedding(512, opt.dec_rnn_size)
+        # embeddings.embedding_size = opt.dec_rnn_size
         return cls(
             opt.rnn_type,
             opt.brnn,

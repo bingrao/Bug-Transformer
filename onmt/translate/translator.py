@@ -513,7 +513,7 @@ class Translator(object):
 
         n_best = batch_tgt_idxs.size(1)
         # (1) Encoder forward.
-        src, enc_states, memory_bank, src_lengths = self._run_encoder(batch)
+        src, enc_states, memory_bank, src_lengths, src_path_vec = self._run_encoder(batch)
 
         # (2) Repeat src objects `n_best` times.
         # We use batch_size x n_best, get ``(src_len, batch * n_best, nfeat)``
@@ -577,13 +577,11 @@ class Translator(object):
             return self._translate_batch_with_strategy(batch, src_vocabs,
                                                        decode_strategy)
 
-    def _run_encoder(self, batch):
+    def _run_encoder(self, batch, src_path_vec=None):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) \
             else (batch.src, None)
 
-        src_path = batch.src_path if hasattr(batch, 'src_path') else None
-
-        enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths, src_path=src_path)
+        enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths, src_path_vec=src_path_vec)
 
         if src_lengths is None:
             assert not isinstance(memory_bank, tuple), \
@@ -592,7 +590,7 @@ class Translator(object):
                 .type_as(memory_bank) \
                 .long() \
                 .fill_(memory_bank.size(0))
-        return src, enc_states, memory_bank, src_lengths
+        return src, enc_states, memory_bank, src_lengths, src_path_vec
 
     def _decode_and_generate(
             self,
@@ -616,11 +614,10 @@ class Translator(object):
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
         # dec_out: (tgt_len, batch*beam_size, nfeats=512)
         # dec_attn: (tgt_len, batch*beam_size, src_len=70)
-        tgt_path = kwargs.get("tgt_path", None)
+        tgt_path_vec = kwargs.get("tgt_path_vec", None)
 
-        dec_out, dec_attn = self.model.decoder(
-            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step, tgt_path=tgt_path
-        )
+        dec_out, dec_attn = self.model.decoder(decoder_in, memory_bank, memory_lengths=memory_lengths,
+                                               step=step, tgt_path_vec=tgt_path_vec)
 
         # Generator forward.
         if not self.copy_attn:
@@ -698,7 +695,16 @@ class Translator(object):
         batch_size = batch.batch_size
 
         # (1) Run the encoder on the src.
-        src, enc_states, memory_bank, src_lengths = self._run_encoder(batch)
+
+        if hasattr(batch, 'src_path') and self.model.path_encoder is not None:
+            src_path_vec, src_path_state = self.model.path_encoder(batch.src_path,
+                                                                   src_len=batch.src.size(0))
+            if self.model.path_decoder is not None:
+                self.model.path_decoder.init_state(batch.src_path, src_path_vec, src_path_state)
+        else:
+            src_path_vec = None
+
+        src, enc_states, memory_bank, src_lengths, src_path_vec = self._run_encoder(batch, src_path_vec)
         self.model.decoder.init_state(src, memory_bank, enc_states)
 
         results = {
@@ -723,8 +729,15 @@ class Translator(object):
             # decoder_input: (tgt_len = 1, batch_size*beam_size, nfeats = 1)
             decoder_input = decode_strategy.current_predictions.view(1, -1, 1)
 
-            # tgt_path = get_tgt_path(batch, step)
-            tgt_path = None
+            if self.model.path_decoder is not None and hasattr(batch, "src_path"):
+                tgt_path = None
+                # tgt_path = get_tgt_path(batch, step)
+                tgt_path_vec, tgt_path_attns = self.model.path_decoder(tgt_path,
+                                                                       memory_bank=src_path_vec,
+                                                                       memory_lengths=batch.src_path[-2],
+                                                                       tgt_len=decoder_input.size(0))
+            else:
+                tgt_path_vec = None
 
             # cacluate probability for each output token
             # log_probs: (tgt_len = 1, batch_size*beam_size, vocab_size=415)
@@ -738,7 +751,7 @@ class Translator(object):
                 src_map=src_map,
                 step=step,
                 batch_offset=decode_strategy.batch_offset,
-                tgt_path=tgt_path)
+                tgt_path_vec=tgt_path_vec)
 
             decode_strategy.advance(log_probs, attn)
             any_finished = decode_strategy.is_finished.any()

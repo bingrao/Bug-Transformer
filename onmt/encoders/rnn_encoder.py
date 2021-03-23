@@ -135,14 +135,13 @@ class PathRNNEncoder(EncoderBase):
     """
 
     def __init__(self, rnn_type, bidirectional, num_layers, input_size,
-                 hidden_size, dropout=0.0, use_bridge=False):
+                 hidden_size, dropout=0.0, embeddings=None, use_bridge=False):
         super(PathRNNEncoder, self).__init__()
 
         num_directions = 2 if bidirectional else 1
         assert hidden_size % num_directions == 0
         hidden_size = hidden_size // num_directions
-        self.embeddings = nn.Embedding(512, input_size)
-
+        self.embeddings = embeddings
         self.rnn, self.no_pack_padded_seq = rnn_factory(rnn_type,
                                                         input_size=input_size,
                                                         hidden_size=hidden_size,
@@ -158,7 +157,7 @@ class PathRNNEncoder(EncoderBase):
                                     num_layers)
 
     @classmethod
-    def from_opt(cls, opt):
+    def from_opt(cls, opt, embeddings):
         """Alternate constructor."""
         return cls(
             rnn_type='LSTM',
@@ -167,6 +166,7 @@ class PathRNNEncoder(EncoderBase):
             input_size=opt.enc_rnn_size,
             hidden_size=opt.enc_rnn_size,
             dropout=opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
+            embeddings=embeddings,
             use_bridge=opt.bridge)
 
     def forward(self, src, lengths=None, position=None, **kwargs):
