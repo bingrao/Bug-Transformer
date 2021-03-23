@@ -221,13 +221,10 @@ class TransformerDecoder(DecoderBase):
                  copy_attn, self_attn_type, dropout, attention_dropout,
                  embeddings, max_relative_positions, aan_useffn,
                  full_context_alignment, alignment_layer,
-                 alignment_heads, path_encoding):
+                 alignment_heads):
         super(TransformerDecoder, self).__init__()
 
         self.embeddings = embeddings
-        self.path_encoding = path_encoding
-        if self.path_encoding:
-            self.path_embeddings = PathEmbeddings(512, d_model)
 
         # Decoder State
         self.state = {}
@@ -267,8 +264,7 @@ class TransformerDecoder(DecoderBase):
             opt.aan_useffn,
             opt.full_context_alignment,
             opt.alignment_layer,
-            alignment_heads=opt.alignment_heads,
-            path_encoding=opt.path_encoding)
+            alignment_heads=opt.alignment_heads)
 
     def init_state(self, src, memory_bank, enc_hidden):
         """Initialize decoder state."""
@@ -318,10 +314,9 @@ class TransformerDecoder(DecoderBase):
         # [batch_size, tgt_len - 1, dim]
         output = emb.transpose(0, 1).contiguous()
 
-        tgt_path = kwargs.get('tgt_path', None)
-        if tgt_path is not None and self.path_encoding:
-            path_vec = self.path_embeddings(output.size(1), tgt_path)
-            output = output + path_vec
+        tgt_path_vec = kwargs.get('tgt_path_vec', None)
+        if tgt_path_vec is not None:
+            output = output + tgt_path_vec.transpose(0, 1)
 
         # [batch_size, src_len, dim]
         src_memory_bank = memory_bank.transpose(0, 1).contiguous()

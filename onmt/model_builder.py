@@ -72,7 +72,7 @@ def build_encoder(opt, embeddings):
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
     enc_type = opt.encoder_type if opt.model_type == "text" \
-        or opt.model_type == "vec" else opt.model_type
+                                   or opt.model_type == "vec" else opt.model_type
     return str2enc[enc_type].from_opt(opt, embeddings)
 
 
@@ -84,7 +84,7 @@ def build_decoder(opt, embeddings):
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
     dec_type = "ifrnn" if opt.decoder_type == "rnn" and opt.input_feed \
-               else opt.decoder_type
+        else opt.decoder_type
     return str2dec[dec_type].from_opt(opt, embeddings)
 
 
@@ -169,7 +169,17 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         device = torch.device("cuda")
     elif not gpu:
         device = torch.device("cpu")
-    model = onmt.models.NMTModel(encoder, decoder)
+
+    if model_opt.path_encoding:
+        from onmt.decoders.decoder import PathRNNDecoder
+        from onmt.encoders.rnn_encoder import PathRNNEncoder
+        path_encoder = PathRNNEncoder.from_opt(model_opt)
+        path_decoder = PathRNNDecoder.from_opt(model_opt)
+    else:
+        path_encoder = None
+        path_decoder = None
+
+    model = onmt.models.NMTModel(encoder, decoder, path_encoder, path_decoder)
 
     # Build Generator.
     if not model_opt.copy_attn:
@@ -197,7 +207,6 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     if model_opt.sampling_type == 'always_sample' \
             and model_opt.mixture_type \
             and 'tf_gate' in model_opt.mixture_type:
-
         model.tf_gate = nn.Sequential(nn.Linear(len(fields["tgt"].vocab), 1), nn.Sigmoid())
 
     # Load the model states from checkpoint or initialize them.

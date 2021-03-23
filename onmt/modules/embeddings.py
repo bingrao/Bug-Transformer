@@ -7,6 +7,9 @@ import torch.nn as nn
 
 from onmt.modules.util_class import Elementwise
 from torch.autograd import Variable
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from onmt.encoders.rnn_encoder import PathRNNEncoder
+
 
 class PositionalEncoding(nn.Module):
     """Sinusoidal positional encoding for non-recurrent neural networks.
@@ -26,7 +29,7 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros(max_len, dim)
         position = torch.arange(0, max_len).unsqueeze(1)
         div_term = torch.exp((torch.arange(0, dim, 2, dtype=torch.float) *
-                             -(math.log(10000.0) / dim)))
+                              -(math.log(10000.0) / dim)))
         pe[:, 0::2] = torch.sin(position.float() * div_term)
         pe[:, 1::2] = torch.cos(position.float() * div_term)
         pe = pe.unsqueeze(1)
@@ -229,7 +232,7 @@ class Embeddings(nn.Module):
         if n_feats != len(feat_padding_idx):
             raise ValueError("Got unequal number of feat_vocab_sizes and "
                              "feat_padding_idx ({:d} != {:d})".format(
-                                n_feats, len(feat_padding_idx)))
+                n_feats, len(feat_padding_idx)))
 
     @property
     def word_lut(self):
@@ -279,7 +282,7 @@ class Embeddings(nn.Module):
                     else:
                         source = module(source)
             else:
-                #TODO
+                # TODO
                 source = self.make_embedding(source)
                 source = source + Variable(position, requires_grad=False)  # Step
 
@@ -298,21 +301,85 @@ class PathEmbeddings(nn.Module):
         super(PathEmbeddings, self).__init__()
         self.d_model = d_model
         self.embeddings = nn.Embedding(node_vocab, d_model)
+        self.embeddings.embedding_size = d_model
         self.lstm = nn.LSTM(d_model, d_model)
+        # self.lstm = PathRNNEncoder(rnn_type='LSTM',
+        #                            bidirectional=False,
+        #                            num_layers=1, hidden_size=d_model,
+        #                            embeddings=self.embeddings)
 
-    def forward(self, x, path):
-        x_path, x_length = path
-        node_embedding = self.embeddings(x_path)
-        path_out, _ = self.lstm(node_embedding, None)
-        path_out = path_out.sum(dim=1)
-        st = 0
-        stack = []
-        for leng in x_length:
-            seq_path = path_out[st:st + leng, :]
-            if x > leng:
-                seq_path = torch.cat([seq_path, torch.zeros((x - leng, self.d_model)).type_as(seq_path)], dim=0)
-            stack.append(seq_path)
-            st += leng
-        path_vec = torch.stack(stack)
+    # def forward(self, x_length, path):
+    #     # x_path, The padded of each AST path
+    #     # x_example_len, The number of paths for each example in a batch
+    #     # x_path_len, The number of AST nodes for each path
+    #     x_path, x_example_len, x_path_len = path
+    #
+    #     # Embedding for each ast node
+    #     node_embedding = self.embeddings(x_path.transpose(0, 1))
+    #
+    #     x_packed_embedding = pack_padded_sequence(node_embedding, x_path_len, enforce_sorted=False)
+    #
+    #     # packed_out
+    #     # hidden [nums_layer * nums_direction, b*l, hidden_dim], torch.Size([1, 3901, 512])
+    #     # cell [nums_layer * nums_direction, b*l, hidden_dim], torch.Size([1, 3901, 512])
+    #     packed_out, (hidden, cell) = self.lstm(x_packed_embedding, None)
+    #
+    #     # [batch_size, (l, dim)]
+    #     output_bag = torch.split(hidden.squeeze(0), x_example_len.cpu().detach().tolist(), dim=0)
+    #     # max_len = max([bag.size(0) for bag in output_bag])
+    #
+    #     path_vec = torch.stack([torch.nn.functional.pad(x, pad=[0, 0, 0, x_length - x.size(0)],
+    #                                                     mode='constant', value=0) for x in output_bag])
+    #
+    #     # unpack your output if required
+    #     # output:
+    #     # input_sizes
+    #     # output, input_sizes = pad_packed_sequence(packed_out, batch_first=True)
+    #     # path_out = output.sum(dim=1)
+    #     # st = 0
+    #     # stack = []
+    #     # for leng in x_example_len:
+    #     #     seq_path = path_out[st:st + leng, :]
+    #     #     if x > leng:
+    #     #         seq_path = torch.cat([seq_path, torch.zeros((x - leng, self.d_model)).type_as(seq_path)], dim=0)
+    #     #     stack.append(seq_path)
+    #     #     st += leng
+    #     # path_vec = torch.stack(stack)
+    #
+    #     return path_vec
+    #
+
+    def forward(self, x_length, path):
+        # x_path, The padded of each AST path
+        # x_example_len, The number of paths for each example in a batch
+        # x_path_len, The number of AST nodes for each path
+        x_path, x_example_len, x_path_len = path
+
+        # packed_out
+        # hidden [nums_layer * nums_direction, b*l, hidden_dim], torch.Size([1, 3901, 512])
+        # cell [nums_layer * nums_direction, b*l, hidden_dim], torch.Size([1, 3901, 512])
+        packed_out, hidden, cell = self.lstm(x_path, lengths=x_path_len)
+
+        # [batch_size, (l, dim)]
+        output_bag = torch.split(hidden.squeeze(0), x_example_len.cpu().detach().tolist(), dim=0)
+        # max_len = max([bag.size(0) for bag in output_bag])
+
+        path_vec = torch.stack([torch.nn.functional.pad(x, pad=[0, 0, 0, x_length - x.size(0)],
+                                                        mode='constant', value=0) for x in output_bag])
+
+        # unpack your output if required
+        # output:
+        # input_sizes
+        # output, input_sizes = pad_packed_sequence(packed_out, batch_first=True)
+        # path_out = output.sum(dim=1)
+        # st = 0
+        # stack = []
+        # for leng in x_example_len:
+        #     seq_path = path_out[st:st + leng, :]
+        #     if x > leng:
+        #         seq_path = torch.cat([seq_path, torch.zeros((x - leng, self.d_model)).type_as(seq_path)], dim=0)
+        #     stack.append(seq_path)
+        #     st += leng
+        # path_vec = torch.stack(stack)
 
         return path_vec

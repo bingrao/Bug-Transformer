@@ -161,14 +161,14 @@ class PathMultiField(Field):
         """
 
         minibatch = list(minibatch)
-        lengths = []
+        lengths_path = []
         # Batch_Size (b) * nums_path_within_seq (k) * nums_node_within_path (l)
         batch_path = []
         max_len = 0
         for seq in minibatch:
             seq = seq[0]
             seq_path = []
-            lengths.append(len(seq))
+            lengths_path.append(len(seq))
             for tok_paths in seq:
                 for path in tok_paths:
                     path.append(self.base_field.eos_token)
@@ -180,14 +180,20 @@ class PathMultiField(Field):
         # flattening (b, k, l) to (b * k, l)
         # this is useful to make torch.tensor
         batch_flatten = [symbol for k in batch_path for symbol in k]
+        batch_path_lengths = [len(p) for p in batch_flatten]
         padded_batch = [self.pad_seq(s, max_len) for s in batch_flatten]
 
         # padded = torch.tensor(padded_batch, dtype=torch.long, device=device)\
         #     .reshape(len(minibatch), -1, max_len)
 
         padded = torch.tensor(padded_batch, dtype=torch.long, device=device)
-
-        return padded, lengths
+        """
+        Return:
+          padded: [b*l, padded_dim], torch.Size([3927, 18]), The nums of padded AST nodes for each path
+          lengths_path: [b, l] sum(lengths_path) ==  b*l. The nums of path for each example
+          batch_path_lengths: [b*l, l_token] Then nums of AST node (including EOS) in each path
+        """
+        return padded, lengths_path, batch_path_lengths
 
     def postprocess(self, x):
         return [f.postprocessing(x) for _, f in self.fields]
@@ -210,10 +216,11 @@ class PathMultiField(Field):
                              "input data is not a tuple of "
                              "(data batch, batch lengths).")
         if isinstance(arr, tuple):
-            arr, lengths = arr
-            lengths = torch.tensor(lengths, dtype=torch.int, device=device)
+            padded, lengths_path, batch_path_lengths = arr
+            lengths_path = torch.tensor(lengths_path, dtype=torch.int, device=device)
+            batch_path_lengths = torch.tensor(batch_path_lengths, dtype=torch.int, device=device)
 
-        return arr, lengths
+        return padded, lengths_path, batch_path_lengths
 
     def preprocess(self, x):
         """Preprocess data.

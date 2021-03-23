@@ -139,8 +139,8 @@ class GlobalAttention(nn.Module):
         """
 
         Args:
-          source (FloatTensor): query vectors ``(batch, tgt_len, dim)``
-          memory_bank (FloatTensor): source vectors ``(batch, src_len, dim)``
+          source (FloatTensor): query vectors ``(batch, tgt_len, dim)``, torch.Size([83, 512])
+          memory_bank (FloatTensor): source vectors ``(batch, src_len, dim)``, torch.Size([83, 47, 512])
           memory_lengths (LongTensor): the source context lengths ``(batch,)``
           coverage (FloatTensor): None (not supported yet)
 
@@ -174,28 +174,28 @@ class GlobalAttention(nn.Module):
             memory_bank += self.linear_cover(cover).view_as(memory_bank)
             memory_bank = torch.tanh(memory_bank)
 
-        # compute attention scores, as in Luong et al.
-        align = self.score(source, memory_bank)
+        # compute attention scores, as in Luong et al. source: torch.Size([83, 1, 512]), memory_bank: torch.Size([83, 47, 512])
+        align = self.score(source, memory_bank)     # torch.Size([83, 1, 47])
 
         if memory_lengths is not None:
-            mask = sequence_mask(memory_lengths, max_len=align.size(-1))
-            mask = mask.unsqueeze(1)  # Make it broadcastable.
+            mask = sequence_mask(memory_lengths, max_len=align.size(-1))    # torch.Size([83, 47])
+            mask = mask.unsqueeze(1)  # Make it broadcastable. torch.Size([83, 1, 47])
             align.masked_fill_(~mask, -float('inf'))
 
         # Softmax or sparsemax to normalize attention weights
         if self.attn_func == "softmax":
-            align_vectors = F.softmax(align.view(batch*target_l, source_l), -1)
+            align_vectors = F.softmax(align.view(batch*target_l, source_l), -1)  # torch.Size([83, 47])
         else:
             align_vectors = sparsemax(align.view(batch*target_l, source_l), -1)
-        align_vectors = align_vectors.view(batch, target_l, source_l)
+        align_vectors = align_vectors.view(batch, target_l, source_l)   # torch.Size([83, 1, 47])
 
         # each context vector c_t is the weighted average
-        # over all the source hidden states
+        # over all the source hidden states, torch.Size([83, 1, 512])
         c = torch.bmm(align_vectors, memory_bank)
 
-        # concatenate
+        # concatenate, torch.Size([83, 1024])
         concat_c = torch.cat([c, source], 2).view(batch*target_l, dim*2)
-        attn_h = self.linear_out(concat_c).view(batch, target_l, dim)
+        attn_h = self.linear_out(concat_c).view(batch, target_l, dim)   # torch.Size([83, 1, 512])
         if self.attn_type in ["general", "dot"]:
             attn_h = torch.tanh(attn_h)
 

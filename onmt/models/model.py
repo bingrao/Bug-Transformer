@@ -1,5 +1,6 @@
 """ Onmt NMT Model base class definition """
 import torch.nn as nn
+import torch
 
 
 class NMTModel(nn.Module):
@@ -12,12 +13,15 @@ class NMTModel(nn.Module):
       decoder (onmt.decoders.DecoderBase): a decoder object
     """
 
-    def __init__(self, encoder, decoder):
+    def __init__(self, encoder, decoder, path_encoder=None, path_decoder=None):
         super(NMTModel, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
+        self.path_encoder = path_encoder
+        self.path_decoder = path_decoder
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False, src_pos=None, tgt_pos=None, **kwargs):
+    def forward(self, src, tgt, lengths, bptt=False, with_align=False,
+                src_pos=None, tgt_pos=None, **kwargs):
         """Forward propagate a `src` and `tgt` pair for training.
         Possible initialized with a beginning decoder state.
 
@@ -47,14 +51,33 @@ class NMTModel(nn.Module):
         tgt_pos = tgt_pos[:-1] if tgt_pos is not None else tgt_pos
 
         src_path = kwargs.get('src_path', None)
-        tgt_path = kwargs.get('tgt_path', None)
+        if src_path is not None:
+            src_path_vec, src_path_state = self.path_encoder(src_path, src_len=src.size(0))
+        else:
+            src_path_vec = None
+            src_path_state = None
 
-        enc_state, memory_bank, lengths = self.encoder(src, lengths, position=src_pos, src_path=src_path)
+        enc_state, memory_bank, lengths = self.encoder(src, lengths, position=src_pos, src_path_vec=src_path_vec)
 
         if bptt is False:
             self.decoder.init_state(src, memory_bank, enc_state)
+            if src_path is not None and self.path_decoder is not None:
+                self.path_decoder.init_state(src_path, src_path_vec, src_path_state)
+
+        tgt_path = kwargs.get('tgt_path', None)
+        if src_path is not None and tgt_path is not None:
+            tgt_path_vec, tgt_path_attns = self.path_decoder(tgt_path,
+                                                             memory_bank=src_path_vec,
+                                                             memory_lengths=src_path[-2],
+                                                             tgt_len=dec_in.size(0))
+        else:
+            tgt_path_vec = None
+            tgt_path_attns = None
+
         dec_out, attns = self.decoder(dec_in, memory_bank, position=tgt_pos,
-                                      memory_lengths=lengths, with_align=with_align, tgt_path=tgt_path)
+                                      memory_lengths=lengths, with_align=with_align,
+                                      tgt_path_vec=tgt_path_vec)
+
         return dec_out, attns
 
     def update_dropout(self, dropout):

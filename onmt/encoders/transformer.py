@@ -10,6 +10,7 @@ from onmt.modules.position_ffn import PositionwiseFeedForward
 from onmt.utils.misc import sequence_mask
 from onmt.modules.embeddings import PathEmbeddings
 import torch
+from onmt.encoders.rnn_encoder import PathRNNEncoder
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -91,20 +92,15 @@ class TransformerEncoder(EncoderBase):
     """
 
     def __init__(self, num_layers, d_model, heads, d_ff, dropout,
-                 attention_dropout, embeddings, max_relative_positions, path_encoding):
+                 attention_dropout, embeddings, max_relative_positions):
         super(TransformerEncoder, self).__init__()
 
         self.embeddings = embeddings
-        self.path_encoding = path_encoding
-
-        if self.path_encoding:
-            self.path_embeddings = PathEmbeddings(512, d_model)
-
         self.transformer = nn.ModuleList(
             [TransformerEncoderLayer(
                 d_model, heads, d_ff, dropout, attention_dropout,
                 max_relative_positions=max_relative_positions)
-             for i in range(num_layers)])
+                for i in range(num_layers)])
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
 
     @classmethod
@@ -117,10 +113,9 @@ class TransformerEncoder(EncoderBase):
             opt.transformer_ff,
             opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
             opt.attention_dropout[0] if type(opt.attention_dropout)
-            is list else opt.attention_dropout,
+                                        is list else opt.attention_dropout,
             embeddings,
-            opt.max_relative_positions,
-            path_encoding=opt.path_encoding)
+            opt.max_relative_positions)
 
     def forward(self, src, lengths=None, position=None, **kwargs):
         """See :func:`EncoderBase.forward()`"""
@@ -130,10 +125,9 @@ class TransformerEncoder(EncoderBase):
         out = emb.transpose(0, 1).contiguous()
         mask = ~sequence_mask(lengths).unsqueeze(1)
 
-        src_path = kwargs.get('src_path', None)
-        if src_path is not None and self.path_encoding:
-            path_vec = self.path_embeddings(out.size(1), src_path)
-            out = out + path_vec
+        src_path_vec = kwargs.get('src_path_vec', None)
+        if src_path_vec is not None:
+            out = out + src_path_vec
 
         # Run the forward pass of every layer of the tranformer.
         for layer in self.transformer:

@@ -331,17 +331,16 @@ class Translator(object):
         if batch_size is None:
             raise ValueError("batch_size must be set")
 
-        src_path = kwargs.get('src_path', None)
-        tgt_path = kwargs.get('tgt_path', None)
-
         src_data = {"reader": self.src_reader, "data": src, "dir": src_dir}
         tgt_data = {"reader": self.tgt_reader, "data": tgt, "dir": None}
         dataset_config = [('src', src_data), ('tgt', tgt_data)]
 
+        src_path = kwargs.get('src_path', None)
         if src_path is not None and self.src_path_reader is not None:
             src_path_data = {"reader": self.src_path_reader, "data": src_path, "dir": None}
             dataset_config.append(('src_path', src_path_data))
 
+        tgt_path = kwargs.get('tgt_path', None)
         if tgt_path is not None and self.tgt_path_reader is not None:
             tgt_path_data = {"reader": self.tgt_path_reader, "data": tgt_path, "dir": None}
             dataset_config.append(('tgt_path', tgt_path_data))
@@ -582,10 +581,7 @@ class Translator(object):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) \
             else (batch.src, None)
 
-        if hasattr(batch, 'src_path'):
-            src_path = batch.src_path
-        else:
-            src_path = None
+        src_path = batch.src_path if hasattr(batch, 'src_path') else None
 
         enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths, src_path=src_path)
 
@@ -607,7 +603,7 @@ class Translator(object):
             memory_lengths,
             src_map=None,
             step=None,
-            batch_offset=None):
+            batch_offset=None, **kwargs):
         if self.copy_attn:
             # Turn any copied words into UNKs.
             decoder_in = decoder_in.masked_fill(
@@ -620,8 +616,10 @@ class Translator(object):
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
         # dec_out: (tgt_len, batch*beam_size, nfeats=512)
         # dec_attn: (tgt_len, batch*beam_size, src_len=70)
+        tgt_path = kwargs.get("tgt_path", None)
+
         dec_out, dec_attn = self.model.decoder(
-            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
+            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step, tgt_path=tgt_path
         )
 
         # Generator forward.
@@ -674,6 +672,26 @@ class Translator(object):
         Returns:
             results (dict): The translation results.
         """
+
+        def get_tgt_path(batch, step):
+            if hasattr(batch, 'src_path'):
+                src_path, src_path_lengths = batch.src_path
+            else:
+                return None
+            tgt_path_length = torch.ones(src_path_lengths.size()[0]).type_as(src_path_lengths)
+            tgt_path = []
+            shift = 0
+            for src_leng in src_path_lengths:
+                if step > src_leng:
+                    st = src_leng - 1
+                else:
+                    st = torch.tensor(step).type_as(src_leng)
+                st += shift
+                tgt_path.append(src_path[st].unsqueeze(0))
+                shift += src_leng
+            tgt_path = torch.cat(tgt_path, dim=0)
+            return tgt_path, tgt_path_length
+
         # (0) Prep the components of the search.
         use_src_map = self.copy_attn
         parallel_paths = decode_strategy.parallel_paths  # beam_size
@@ -705,6 +723,9 @@ class Translator(object):
             # decoder_input: (tgt_len = 1, batch_size*beam_size, nfeats = 1)
             decoder_input = decode_strategy.current_predictions.view(1, -1, 1)
 
+            # tgt_path = get_tgt_path(batch, step)
+            tgt_path = None
+
             # cacluate probability for each output token
             # log_probs: (tgt_len = 1, batch_size*beam_size, vocab_size=415)
             # attn: (tgt_len, batch_size*beam_size, src_len=70)
@@ -716,7 +737,8 @@ class Translator(object):
                 memory_lengths=memory_lengths,
                 src_map=src_map,
                 step=step,
-                batch_offset=decode_strategy.batch_offset)
+                batch_offset=decode_strategy.batch_offset,
+                tgt_path=tgt_path)
 
             decode_strategy.advance(log_probs, attn)
             any_finished = decode_strategy.is_finished.any()
