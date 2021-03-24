@@ -29,7 +29,7 @@ train:
   save_checkpoint_steps: 5000
   keep_checkpoint: 1000
   seed: 3435
-  train_steps: 100000
+  train_steps: 50000
   valid_steps: 5000
   early_stopping: 10
   warmup_steps: 4000

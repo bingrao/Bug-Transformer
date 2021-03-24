@@ -411,12 +411,20 @@ class Trainer(object):
                     tgt_path = None
 
                 # F-prop through the model.
-                outputs, attns = valid_model(src, tgt, src_lengths, with_align=self.with_align,
-                                             src_pos=src_pos, tgt_pos=tgt_pos,
-                                             src_path=src_path, tgt_path=tgt_path)
+                outputs, attns, outputs_path, attns_path = valid_model(src, tgt, src_lengths,
+                                                                       with_align=self.with_align,
+                                                                       src_pos=src_pos, tgt_pos=tgt_pos,
+                                                                       src_path=src_path, tgt_path=tgt_path)
 
                 # Compute loss.
                 _, batch_stats = self.valid_loss(batch, outputs, attns)
+
+                if self.train_path_loss is not None:
+                    _, _batch_stats = self.train_path_loss(
+                        batch,
+                        outputs_path,
+                        attns_path)
+                    stats.update(_batch_stats)
 
                 # Update statistics.
                 stats.update(batch_stats)
@@ -654,8 +662,8 @@ class Trainer(object):
             # The standard model
             # outputs: [tgt_len - 1, batch_size, dim], e.g. torch.Size([67, 61, 512])
             # attns: [tgt_len - 1, batch_size, src_len], e.g. torch.Size([67, 61, 48])
-            outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
-                                        with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
+            outputs, attns, _, _ = self.model(src, tgt, src_lengths, bptt=bptt,
+                                              with_align=self.with_align, src_pos=src_pos, tgt_pos=tgt_pos)
         else:
             # exclude last target from inputs
             # Shape: [tgt_len - 1, batch_size, 1], e.g. dec_in: torch.Size([67, 61, 1])
