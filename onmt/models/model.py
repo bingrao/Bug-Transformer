@@ -66,7 +66,7 @@ class NMTModel(nn.Module):
         if src_path is not None and tgt_path is not None:
             tgt_path_vec, tgt_path_attns, tgt_path_output = self.path_decoder(tgt_path,
                                                                               memory_bank=src_path_vec,
-                                                                              memory_lengths=src_path[-2],
+                                                                              memory_lengths=lengths,
                                                                               tgt_len=dec_in.size(0))
         else:
             tgt_path_vec = None

@@ -313,11 +313,9 @@ class StdRNNDecoder(RNNDecoderBase):
 
         # Calculate the context gate.
         if self.context_gate is not None:
-            dec_outs = self.context_gate(
-                emb.view(-1, emb.size(2)),
-                rnn_output.view(-1, rnn_output.size(2)),
-                dec_outs.view(-1, dec_outs.size(2))
-            )
+            dec_outs = self.context_gate(emb.view(-1, emb.size(2)),
+                                         rnn_output.view(-1, rnn_output.size(2)),
+                                         dec_outs.view(-1, dec_outs.size(2)))
             dec_outs = dec_outs.view(tgt_len, tgt_batch, self.hidden_size)
 
         dec_outs = self.dropout(dec_outs)
@@ -411,9 +409,7 @@ class InputFeedRNNDecoder(RNNDecoderBase):
             if self.context_gate is not None:
                 # TODO: context gate should be employed
                 # instead of second RNN transform.
-                decoder_output = self.context_gate(
-                    decoder_input, rnn_output, decoder_output
-                )
+                decoder_output = self.context_gate(decoder_input, rnn_output, decoder_output)
             decoder_output = self.dropout(decoder_output)
             input_feed = decoder_output
 
@@ -425,8 +421,7 @@ class InputFeedRNNDecoder(RNNDecoderBase):
                 attns["coverage"] += [coverage]
 
             if self.copy_attn is not None:
-                _, copy_attn = self.copy_attn(
-                    decoder_output, memory_bank.transpose(0, 1))
+                _, copy_attn = self.copy_attn(decoder_output, memory_bank.transpose(0, 1))
                 attns["copy"] += [copy_attn]
             elif self._reuse_copy_attn:
                 attns["copy"] = attns["std"]
@@ -466,94 +461,6 @@ class PathRNNDecoder(RNNDecoderBase):
     Implemented without input_feeding and currently with no `coverage_attn`
     or `copy_attn` support.
     """
-
-    # def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None):
-    #     """
-    #     See StdRNNDecoder._run_forward_pass() for description
-    #     of arguments and return values.
-    #     """
-    #
-    #     def padded_init_state(len_src, len_init, state):
-    #         if len_src > len_init:
-    #             last = state[:, -1, :].unsqueeze(1)
-    #             padded_last = torch.cat((len_src - len_init) * [last], dim=1)
-    #             state = torch.cat([state, padded_last], dim=1)
-    #         else:
-    #             state = state[:, :len_src, :]
-    #         return state
-    #
-    #     # assert self.copy_attn is None  # TODO, no support yet.
-    #     # assert not self._coverage  # TODO, no support yet.
-    #     #
-    #     # attns = {}
-    #     x_path, x_example_len, x_path_len = tgt
-    #     x_path = x_path.transpose(0, 1)
-    #
-    #     # Additional args check.
-    #     input_feed = self.state["input_feed"].squeeze(0)    # [batch_size, dim], torch.Size([83, 512])
-    #     input_feed_batch, _ = input_feed.size()
-    #     _, tgt_batch = x_path.size()
-    #     # aeq(tgt_batch, input_feed_batch)
-    #     # END Additional args check.
-    #
-    #     dec_outs = []
-    #     attns = {}
-    #     if self.attn is not None:
-    #         attns["std"] = []
-    #     if self.copy_attn is not None or self._reuse_copy_attn:
-    #         attns["copy"] = []
-    #     if self._coverage:
-    #         attns["coverage"] = []
-    #
-    #     emb = self.embeddings(x_path)
-    #     assert emb.dim() == 3  # len x batch x embedding_dim
-    #
-    #     dec_state = self.state["hidden"]
-    #     coverage = self.state["coverage"].squeeze(0) if self.state["coverage"] is not None else None
-    #
-    #     hidden, cell = self.state["hidden"]
-    #     hidden = padded_init_state(emb.size(1), hidden.size(1), hidden)
-    #     cell = padded_init_state(emb.size(1), cell.size(1), cell)
-    #     dec_state = (hidden, cell)
-    #
-    #     # Input feed concatenates hidden state with
-    #     # input at every time step.
-    #     input_feed = padded_init_state(tgt_batch, input_feed_batch, input_feed.unsqueeze(0))
-    #     for emb_t in emb.split(1):
-    #         decoder_input = torch.cat([emb_t, input_feed], 0)
-    #         rnn_output, dec_state = self.rnn(decoder_input, dec_state)
-    #         if self.attentional:
-    #             decoder_output, p_attn = self.attn(
-    #                 rnn_output,
-    #                 memory_bank.transpose(0, 1),
-    #                 memory_lengths=memory_lengths)
-    #             attns["std"].append(p_attn)
-    #         else:
-    #             decoder_output = rnn_output
-    #         if self.context_gate is not None:
-    #             # TODO: context gate should be employed
-    #             # instead of second RNN transform.
-    #             decoder_output = self.context_gate(
-    #                 decoder_input, rnn_output, decoder_output
-    #             )
-    #         decoder_output = self.dropout(decoder_output)
-    #         input_feed = decoder_output
-    #
-    #         dec_outs += [decoder_output]
-    #
-    #         # Update the coverage attention.
-    #         if self._coverage:
-    #             coverage = p_attn if coverage is None else p_attn + coverage
-    #             attns["coverage"] += [coverage]
-    #
-    #         if self.copy_attn is not None:
-    #             _, copy_attn = self.copy_attn(
-    #                 decoder_output, memory_bank.transpose(0, 1))
-    #             attns["copy"] += [copy_attn]
-    #         elif self._reuse_copy_attn:
-    #             attns["copy"] = attns["std"]
-    #
-    #     return dec_state, dec_outs, attns
 
     def _run_forward_pass(self, tgt, memory_bank=None, memory_lengths=None, **kwargs):
         """
@@ -602,7 +509,7 @@ class PathRNNDecoder(RNNDecoderBase):
 
         # lengths = x_path_len
         packed_emb = emb
-        # if lengths is not None:
+        # if self.training and lengths is not None:
         #     # Lengths data is wrapped inside a Tensor.
         #     lengths_list = lengths.view(-1).tolist()
         #     packed_emb = pack(emb, lengths_list, enforce_sorted=False)
@@ -616,7 +523,7 @@ class PathRNNDecoder(RNNDecoderBase):
         else:
             rnn_output, dec_state = self.rnn(packed_emb, (hidden, cell))
 
-        # if lengths is not None:
+        # if self.training and lengths is not None:
         #     rnn_output, _ = unpack(rnn_output)
 
         # Check
@@ -640,11 +547,9 @@ class PathRNNDecoder(RNNDecoderBase):
 
         # Calculate the context gate.
         if self.context_gate is not None:
-            dec_outs = self.context_gate(
-                emb.view(-1, emb.size(2)),
-                rnn_output.view(-1, rnn_output.size(2)),
-                dec_outs.view(-1, dec_outs.size(2))
-            )
+            dec_outs = self.context_gate(emb.view(-1, emb.size(2)),
+                                         rnn_output.view(-1, rnn_output.size(2)),
+                                         dec_outs.view(-1, dec_outs.size(2)))
             dec_outs = dec_outs.view(tgt_len, tgt_batch, self.hidden_size)
 
         dec_outs = self.dropout(dec_outs)

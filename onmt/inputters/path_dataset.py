@@ -171,8 +171,10 @@ class PathMultiField(Field):
             lengths_path.append(len(seq))
             for tok_paths in seq:
                 for path in tok_paths:
-                    path.append(self.base_field.eos_token)
-                    arr = [self.base_field.vocab.stoi[x] for x in path]
+                    padded_path = ([self.base_field.init_token] if self.base_field.init_token is not None else [])\
+                                  + path \
+                                  + ([self.base_field.eos_token] if self.base_field.eos_token is not None else [])
+                    arr = [self.base_field.vocab.stoi[x] for x in padded_path]
                     max_len = max_len if max_len > len(arr) else len(arr)
                     seq_path.append(arr)
             batch_path.append(seq_path)

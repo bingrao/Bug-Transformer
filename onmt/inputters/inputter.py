@@ -175,7 +175,7 @@ def get_fields(
     if opt is not None and src_data_type == 'code' and (opt.train_src_path is not None or opt.valid_src_path is not None):
         src_path_field_kwargs = {"n_feats": n_src_feats,
                                  "include_lengths": True,
-                                 "pad": pad, "bos": bos, "eos": eos,
+                                 "pad": pad, "bos": None, "eos": eos,
                                  "path_vec_size": opt.path_vec_size,
                                  "truncate": src_truncate,
                                  "base_name": "src_path"}
