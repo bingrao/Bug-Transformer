@@ -72,7 +72,7 @@ class FocalLoss(nn.Module):
         return loss
 
 
-def build_loss_compute(model, tgt_field, opt, train=True):
+def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
     """
     Returns a LossCompute subclass which wraps around an nn.Module subclass
     (such as nn.NLLLoss) which defines the loss criterion. The LossCompute
@@ -116,7 +116,12 @@ def build_loss_compute(model, tgt_field, opt, train=True):
     # passed to the NMTLossCompute. At the moment, the only supported
     # loss function of this kind is the sparsemax loss.
     use_raw_logits = isinstance(criterion, SparsemaxLoss)
-    loss_gen = model.generator[0] if use_raw_logits else model.generator
+
+    if path_loss:
+        loss_gen = model.path_generator[0] if use_raw_logits else model.path_generator
+    else:
+        loss_gen = model.generator[0] if use_raw_logits else model.generator
+
     if opt.copy_attn:
         compute = onmt.modules.CopyGeneratorLossCompute(
             criterion, loss_gen, tgt_field.vocab, opt.copy_loss_by_seqlength,
@@ -125,7 +130,7 @@ def build_loss_compute(model, tgt_field, opt, train=True):
     else:
         compute = NMTLossCompute(
             criterion, loss_gen, lambda_coverage=opt.lambda_coverage,
-            lambda_align=opt.lambda_align)
+            lambda_align=opt.lambda_align, path_loss=path_loss)
     compute.to(device)
 
     return compute
@@ -150,16 +155,17 @@ class LossComputeBase(nn.Module):
         normalzation (str): normalize by "sents" or "tokens"
     """
 
-    def __init__(self, criterion, generator):
+    def __init__(self, criterion, generator, path_loss=False):
         super(LossComputeBase, self).__init__()
         self.criterion = criterion
         self.generator = generator
+        self.path_loss = path_loss
 
     @property
     def padding_idx(self):
         return self.criterion.ignore_index
 
-    def _make_shard_state(self, batch, output, range_, attns=None):
+    def _make_shard_state(self, batch, output, range_, attns=None, output_path=None):
         """
         Make shard state dictionary for shards() to return iterable
         shards for efficient loss computation. Subclass must define
@@ -230,8 +236,11 @@ class LossComputeBase(nn.Module):
             loss = _loss / float(normalization)
             # loss = loss - match_loss * 0.001
             return loss, stats
+
         batch_stats = onmt.utils.Statistics()
-        for shard in shards(shard_state, shard_size):  # shard['output'].shape, torch.Size([2, 61, 512]), shard['target'].shape: torch.Size([2, 61])
+
+        # shard['output'].shape, torch.Size([2, 61, 512]), shard['target'].shape: torch.Size([2, 61])
+        for idx, shard in enumerate(shards(shard_state, shard_size)):
             _loss, stats, match_loss = self._compute_loss(batch, **shard)
             loss = _loss.div(float(normalization))
 
@@ -239,7 +248,11 @@ class LossComputeBase(nn.Module):
             #     logger.info(f"[********] The match loss is : {match_loss} -- {loss}")
 
             # loss = loss - match_loss * 0.001
-            loss.backward()
+            if idx == 0 and not self.path_loss:
+                loss.backward(retain_graph=True)
+            else:
+                loss.backward()
+
             batch_stats.update(stats)
         return None, batch_stats
 
@@ -303,12 +316,12 @@ class NMTLossCompute(LossComputeBase):
     """
 
     def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0):
-        super(NMTLossCompute, self).__init__(criterion, generator)
+                 lambda_coverage=0.0, lambda_align=0.0, path_loss=False):
+        super(NMTLossCompute, self).__init__(criterion, generator, path_loss)
         self.lambda_coverage = lambda_coverage
         self.lambda_align = lambda_align
 
-    def _make_shard_state(self, batch, output, range_, attns=None):
+    def _make_shard_state(self, batch, output, range_, attns=None, output_path=None):
         """
 
         :param batch:
@@ -321,8 +334,13 @@ class NMTLossCompute(LossComputeBase):
             # output.shape: [tgt_len, batch_size, dim] e.g.torch.Size([67, 61, 512])
             # target.shape: [tgt_len, batch_size] e.g.torch.Size([67, 61])
             "output": output,
-            "target": batch.tgt[range_[0] + 1: range_[1], :, 0],
         }
+
+        if self.path_loss and hasattr(batch, 'tgt_path'):
+            shard_state['target'] = batch.tgt_path[0].transpose(0, 1).contiguous()
+        else:
+            shard_state["target"] = batch.tgt[range_[0] + 1: range_[1], :, 0].contiguous()
+
         if self.lambda_coverage != 0.0:
             coverage = attns.get("coverage", None)
             std = attns.get("std", None)
@@ -384,7 +402,7 @@ class NMTLossCompute(LossComputeBase):
         gtruth = target.view(-1)
 
         match_loss = get_max_match_greedy_decode(scores, gtruth).div(float(gtruth.shape[0]))
-
+        # scores [shard_size*batch_size, vocab_size], torch.Size([166, 558]), gtruth: [shard_size*batch_size], torch.Size([166])
         loss = self.criterion(scores, gtruth)
         if self.lambda_coverage != 0.0:
             coverage_loss = self._compute_coverage_loss(

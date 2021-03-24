@@ -160,6 +160,7 @@ class RNNDecoderBase(DecoderBase):
 
     def init_state(self, src, memory_bank, encoder_final):
         """Initialize decoder state with last state of the encoder."""
+
         def _fix_enc_hidden(hidden):
             # The encoder hidden is  (layers*directions) x batch x dim. torch.Size([6, 83, 512])
             # We need to convert it to layers x batch x (directions*dim).
@@ -172,13 +173,13 @@ class RNNDecoderBase(DecoderBase):
             self.state["hidden"] = tuple(_fix_enc_hidden(enc_hid)
                                          for enc_hid in encoder_final)
         else:  # GRU
-            self.state["hidden"] = (_fix_enc_hidden(encoder_final), )
+            self.state["hidden"] = (_fix_enc_hidden(encoder_final),)
 
         # Init the input feed.
         batch_size = self.state["hidden"][0].size(1)
         h_size = (batch_size, self.hidden_size)
         self.state["input_feed"] = \
-            self.state["hidden"][0].data.new(*h_size).zero_().unsqueeze(0) # torch.Size([1, 83, 512])
+            self.state["hidden"][0].data.new(*h_size).zero_().unsqueeze(0)  # torch.Size([1, 83, 512])
         self.state["coverage"] = None
 
     def map_state(self, fn):
@@ -435,7 +436,7 @@ class InputFeedRNNDecoder(RNNDecoderBase):
     def _build_rnn(self, rnn_type, input_size,
                    hidden_size, num_layers, dropout):
         assert rnn_type != "SRU", "SRU doesn't support input feed! " \
-            "Please set -input_feed 0!"
+                                  "Please set -input_feed 0!"
         stacked_cell = StackedLSTM if rnn_type == "LSTM" else StackedGRU
         return stacked_cell(num_layers, input_size, hidden_size, dropout)
 
@@ -465,6 +466,7 @@ class PathRNNDecoder(RNNDecoderBase):
     Implemented without input_feeding and currently with no `coverage_attn`
     or `copy_attn` support.
     """
+
     # def _run_forward_pass(self, tgt, memory_bank, memory_lengths=None):
     #     """
     #     See StdRNNDecoder._run_forward_pass() for description
@@ -590,15 +592,20 @@ class PathRNNDecoder(RNNDecoderBase):
 
         attns = {}
         x_path, x_example_len, x_path_len = tgt
+        if x_path.dim() == 2:
+            emb = self.embeddings(x_path.unsqueeze(-1))
+            emb = emb.transpose(0, 1)
+            tgt_batch, tgt_len = x_path.size()
+        else:
+            tgt_len, tgt_batch, _ = x_path.size()
+            emb = x_path
 
-        emb = self.embeddings(x_path.transpose(0, 1))
-
-        lengths = x_path_len
+        # lengths = x_path_len
         packed_emb = emb
-        if lengths is not None:
-            # Lengths data is wrapped inside a Tensor.
-            lengths_list = lengths.view(-1).tolist()
-            packed_emb = pack(emb, lengths_list, enforce_sorted=False)
+        # if lengths is not None:
+        #     # Lengths data is wrapped inside a Tensor.
+        #     lengths_list = lengths.view(-1).tolist()
+        #     packed_emb = pack(emb, lengths_list, enforce_sorted=False)
 
         hidden, cell = self.state["hidden"]
         hidden = padded_init_state(emb.size(1), hidden.size(1), hidden)
@@ -609,21 +616,19 @@ class PathRNNDecoder(RNNDecoderBase):
         else:
             rnn_output, dec_state = self.rnn(packed_emb, (hidden, cell))
 
-        if lengths is not None:
-            rnn_output, _ = unpack(rnn_output)
+        # if lengths is not None:
+        #     rnn_output, _ = unpack(rnn_output)
+
+        # Check
+        output_len, output_batch, _ = rnn_output.size()
+        aeq(tgt_len, output_len)
+        aeq(tgt_batch, output_batch)
 
         output_bag = torch.split(dec_state[0].squeeze(0),
                                  x_example_len.cpu().detach().tolist(), dim=0)
 
-        tgt_len = kwargs.get("tgt_len", 100)
-        tgt_path_vec = torch.stack([torch.nn.functional.pad(x, pad=[0, 0, 0, tgt_len - x.size(0)],
+        tgt_path_vec = torch.stack([torch.nn.functional.pad(x, pad=[0, 0, 0, kwargs.get("tgt_len", 100) - x.size(0)],
                                                             mode='constant', value=0) for x in output_bag])
-
-        # Check
-        tgt_batch, tgt_len = x_path.size()
-        output_len, output_batch, _ = rnn_output.size()
-        aeq(tgt_len, output_len)
-        aeq(tgt_batch, output_batch)
 
         # Calculate the attention.
         if not self.attentional:
@@ -643,7 +648,7 @@ class PathRNNDecoder(RNNDecoderBase):
             dec_outs = dec_outs.view(tgt_len, tgt_batch, self.hidden_size)
 
         dec_outs = self.dropout(dec_outs)
-        return dec_state, dec_outs, attns
+        return dec_state, dec_outs, attns, rnn_output
 
     def _build_rnn(self, rnn_type, **kwargs):
         rnn, _ = rnn_factory(rnn_type, **kwargs)
@@ -671,8 +676,8 @@ class PathRNNDecoder(RNNDecoderBase):
               :param step:
         """
 
-        dec_state, dec_outs, attns = self._run_forward_pass(tgt, memory_bank,
-                                                            memory_lengths=memory_lengths, **kwargs)
+        dec_state, dec_outs, attns, rnn_output = self._run_forward_pass(tgt, memory_bank,
+                                                                        memory_lengths=memory_lengths, **kwargs)
 
         # Update the state with the result.
         if not isinstance(dec_state, tuple):
@@ -694,8 +699,7 @@ class PathRNNDecoder(RNNDecoderBase):
             for k in attns:
                 if type(attns[k]) == list:
                     attns[k] = torch.stack(attns[k])
-        return dec_outs, attns
-
+        return dec_outs, attns, rnn_output
 
     @property
     def _input_size(self):
@@ -724,6 +728,7 @@ class PathRNNDecoder(RNNDecoderBase):
 
     def init_state(self, src, memory_bank, encoder_final):
         """Initialize decoder state with last state of the encoder."""
+
         def _fix_enc_hidden(hidden):
             # The encoder hidden is  (layers*directions) x batch x dim. torch.Size([6, 83, 512])
             # We need to convert it to layers x batch x (directions*dim).
@@ -731,16 +736,17 @@ class PathRNNDecoder(RNNDecoderBase):
                 hidden = torch.cat([hidden[0:hidden.size(0):2],
                                     hidden[1:hidden.size(0):2]], 2)
             return hidden
+
         src_path, src_example_len, src_path_len = src
         if isinstance(encoder_final, tuple):  # LSTM
             self.state["hidden"] = tuple(_fix_enc_hidden(enc_hid)
                                          for enc_hid in encoder_final)
         else:  # GRU
-            self.state["hidden"] = (_fix_enc_hidden(encoder_final), )
+            self.state["hidden"] = (_fix_enc_hidden(encoder_final),)
 
         # Init the input feed.
         batch_size = self.state["hidden"][0].size(1)
         h_size = (batch_size, self.hidden_size)
         self.state["input_feed"] = \
-            self.state["hidden"][0].data.new(*h_size).zero_().unsqueeze(0) # torch.Size([1, batch_size, dim])
+            self.state["hidden"][0].data.new(*h_size).zero_().unsqueeze(0)  # torch.Size([1, batch_size, dim])
         self.state["coverage"] = None

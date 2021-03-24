@@ -175,7 +175,8 @@ class PathRNNEncoder(EncoderBase):
         # x_path_len [b*l], The number of AST nodes (k) for each path
         x_path, x_example_len, x_path_len = src
 
-        emb = self.embeddings(x_path.transpose(0, 1))
+        emb = self.embeddings(x_path.unsqueeze(-1))
+        emb = emb.transpose(0, 1)
         if lengths is None:
             lengths = x_path_len
 

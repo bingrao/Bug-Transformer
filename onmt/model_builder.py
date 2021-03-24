@@ -21,7 +21,7 @@ from onmt.utils.parse import ArgumentParser
 from onmt.modules.embeddings import PathEmbeddings
 
 
-def build_embeddings(opt, text_field, for_encoder=True):
+def build_embeddings(opt, text_field, for_encoder=True, position_encoding=None, init_path=None):
     """
     Args:
         opt: the option in current environment.
@@ -50,7 +50,7 @@ def build_embeddings(opt, text_field, for_encoder=True):
 
     emb = Embeddings(
         word_vec_size=emb_dim,
-        position_encoding=opt.position_encoding,
+        position_encoding=opt.position_encoding if position_encoding is None else position_encoding,
         feat_merge=opt.feat_merge,
         feat_vec_exponent=opt.feat_vec_exponent,
         feat_vec_size=opt.feat_vec_size,
@@ -61,7 +61,8 @@ def build_embeddings(opt, text_field, for_encoder=True):
         feat_vocab_sizes=num_feat_embeddings,
         sparse=opt.optim == "sparseadam",
         fix_word_vecs=fix_word_vecs,
-        opt=opt)
+        opt=opt,
+        init_path=init_path)
     return emb
 
 
@@ -106,8 +107,7 @@ def load_test_model(model, opt, model_path=None):
     else:
         fields = vocab
 
-    model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint,
-                             opt.gpu)
+    model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint, opt.gpu)
     if opt.fp32:
         model.float()
     model.eval()
@@ -171,16 +171,45 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     elif not gpu:
         device = torch.device("cpu")
 
+    model = onmt.models.NMTModel(encoder, decoder)
+
     if model_opt.path_encoding:
         from onmt.decoders.decoder import PathRNNDecoder
         from onmt.encoders.rnn_encoder import PathRNNEncoder
-        path_encoder = PathRNNEncoder.from_opt(model_opt, PathEmbeddings(model_opt, fields["src_path"]))
-        path_decoder = PathRNNDecoder.from_opt(model_opt, PathEmbeddings(model_opt, fields["tgt_path"]))
-    else:
-        path_encoder = None
-        path_decoder = None
+        src_path_field = fields["src_path"]
+        tgt_path_field = fields["tgt_path"]
+        path = ['CompilationUnit', 'ClassOrInterfaceDeclaration', 'MethodDeclaration', 'Modifier',
+                tgt_path_field.base_field.eos_token]
+        init_path = [tgt_path_field.base_field.vocab.stoi[x] for x in path]
 
-    model = onmt.models.NMTModel(encoder, decoder, path_encoder, path_decoder)
+        src_path_emb = build_embeddings(model_opt, src_path_field, position_encoding=False)
+        tgt_path_emb = build_embeddings(model_opt, tgt_path_field, for_encoder=False,
+                                        position_encoding=False, init_path=init_path)
+
+        if model_opt.share_embeddings:
+            # src/tgt vocab should be the same if `-share_vocab` is specified.
+            assert src_path_field.base_field.vocab == tgt_path_field.base_field.vocab, \
+                "preprocess with -share_vocab if you use share_embeddings for path embedding"
+
+            tgt_path_emb.word_lut.weight = src_path_emb.word_lut.weight
+
+        path_encoder = PathRNNEncoder.from_opt(model_opt, src_path_emb)
+        path_decoder = PathRNNDecoder.from_opt(model_opt, tgt_path_emb)
+
+        if model_opt.generator_function == "sparsemax":
+            gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
+        else:
+            gen_func = nn.LogSoftmax(dim=-1)
+        path_generator = nn.Sequential(
+            nn.Linear(model_opt.dec_rnn_size, len(tgt_path_field.base_field.vocab)),
+            Cast(torch.float32),
+            gen_func)
+        if model_opt.share_decoder_embeddings:
+            path_generator[0].weight = path_decoder.embeddings.word_lut.weight
+
+        model.path_encoder = path_encoder
+        model.path_decoder = path_decoder
+        model.path_generator = path_generator
 
     # Build Generator.
     if not model_opt.copy_attn:
@@ -189,11 +218,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         else:
             gen_func = nn.LogSoftmax(dim=-1)
         generator = nn.Sequential(
-            nn.Linear(model_opt.dec_rnn_size,
-                      len(fields["tgt"].base_field.vocab)),
+            nn.Linear(model_opt.dec_rnn_size, len(fields["tgt"].base_field.vocab)),
             Cast(torch.float32),
-            gen_func
-        )
+            gen_func)
         if model_opt.share_decoder_embeddings:
             generator[0].weight = decoder.embeddings.word_lut.weight
     else:

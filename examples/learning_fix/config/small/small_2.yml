@@ -58,14 +58,14 @@ train:
   dropout: 0.1
   label_smoothing: 0.1
 
-  max_generator_batches: 2
+  max_generator_batches: 0
 
   param_init: 0.0
   param_init_glorot: 'true'
   position_encoding: 'true'
   path_encoding: 'true'
-
-
+  share_embeddings: 'true'
+  share_decoder_embeddings: 'true'
 
   master_port: 8002
   world_size: 4
@@ -77,7 +77,7 @@ train:
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/small/2/small-step-30000-acc-98.50-ppl-1.06-xent-0.06.pt
+  model: examples/learning_fix/data/small/2/small-step-5000-acc-92.82-ppl-1.30-xent-0.27.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   src_path: examples/learning_fix/data/small/test-buggy-path.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt

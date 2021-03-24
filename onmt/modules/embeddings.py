@@ -141,12 +141,13 @@ class Embeddings(nn.Module):
                  dropout=0,
                  sparse=False,
                  fix_word_vecs=False,
-                 opt=None):
+                 opt=None,
+                 init_path=None):
         self._validate_args(feat_merge, feat_vocab_sizes, feat_vec_exponent,
                             feat_vec_size, feat_padding_idx)
 
         self.opt = opt
-
+        self.init_path = init_path
         if feat_padding_idx is None:
             feat_padding_idx = []
         self.word_padding_idx = word_padding_idx
@@ -295,6 +296,15 @@ class Embeddings(nn.Module):
         if self.position_encoding:
             self.pe.dropout.p = dropout
 
+    def get_init_embedding(self, batch_size, path_input=None):
+        x_example_len = torch.tensor([1] * batch_size)
+        if path_input is None:
+            x_path = torch.tensor([self.init_path] * batch_size)
+            x_path_len = torch.tensor([len(self.init_path)] * batch_size)
+            return x_path, x_example_len, x_path_len
+        else:
+            return path_input, x_example_len, x_example_len
+
 
 class PathEmbeddings(nn.Module):
     def __init__(self, model_opt, fields):
@@ -309,12 +319,14 @@ class PathEmbeddings(nn.Module):
     def forward(self, x):
         return self.embeddings(x)
 
-    def get_init_embedding(self, batch_size):
-        path = ['CompilationUnit', 'ClassOrInterfaceDeclaration', 'MethodDeclaration', 'Modifier',
-                self.fields.base_field.eos_token]
-        index_path = [self.fields.base_field.vocab.stoi[x] for x in path]
-        x_path = torch.tensor([index_path] * batch_size)
+    def get_init_embedding(self, batch_size, path_input=None):
         x_example_len = torch.tensor([1] * batch_size)
-        x_path_len = torch.tensor([len(index_path)] * batch_size)
-
-        return x_path, x_example_len, x_path_len
+        if path_input is None:
+            path = ['CompilationUnit', 'ClassOrInterfaceDeclaration', 'MethodDeclaration', 'Modifier',
+                    self.fields.base_field.eos_token]
+            index_path = [self.fields.base_field.vocab.stoi[x] for x in path]
+            x_path = torch.tensor([self.init_path] * batch_size)
+            x_path_len = torch.tensor([len(self.init_path)] * batch_size)
+            return x_path, x_example_len, x_path_len
+        else:
+            return path_input, x_example_len, x_example_len

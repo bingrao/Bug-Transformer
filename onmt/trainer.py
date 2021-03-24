@@ -22,6 +22,7 @@ from onmt.utils.distributed import all_gather_list, all_reduce_and_rescale_tenso
 import random
 import math
 
+
 def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
     """
     Simplify `Trainer` creation based on user `opt`s*
@@ -41,6 +42,16 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
     tgt_field = dict(fields)["tgt"].base_field
     train_loss = onmt.utils.loss.build_loss_compute(model, tgt_field, opt)
     valid_loss = onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=False)
+
+    if "tgt_path" in fields and opt.path_encoding:
+        train_path_loss = onmt.utils.loss.build_loss_compute(model,
+                                                             dict(fields)["tgt_path"].base_field,
+                                                             opt, path_loss=True)
+        valid_path_loss = onmt.utils.loss.build_loss_compute(model,
+                                                             dict(fields)["tgt_path"].base_field,
+                                                             opt, train=False, path_loss=True)
+    else:
+        train_path_loss, valid_path_loss = None, None
 
     trunc_size = opt.truncated_decoder  # Badly named...
     shard_size = opt.max_generator_batches if opt.model_dtype == 'fp32' else 0
@@ -95,7 +106,9 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
                            dropout=dropout,
                            dropout_steps=dropout_steps,
                            source_noise=source_noise,
-                           opt=opt)
+                           opt=opt,
+                           train_path_loss=train_path_loss,
+                           valid_path_loss=valid_path_loss)
     return trainer
 
 
@@ -134,12 +147,14 @@ class Trainer(object):
                  average_decay=0, average_every=1, model_dtype='fp32',
                  earlystopper=None, dropout=[0.3], dropout_steps=[0],
                  source_noise=None,
-                 opt=None):
+                 opt=None, train_path_loss=None, valid_path_loss=None):
 
         # Basic attributes.
         self.model = model
         self.train_loss = train_loss
+        self.train_path_loss = train_path_loss
         self.valid_loss = valid_loss
+        self.valid_path_loss = valid_path_loss
         self.optim = optim
         self.trunc_size = trunc_size
         self.shard_size = shard_size
@@ -470,9 +485,10 @@ class Trainer(object):
                     #     new_tgt[:src.size(0), :, :] = src
                     # else:
                     #     new_tgt = src[:tgt.size(0), :, :]
-                    outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt, with_align=self.with_align,
-                                                src_pos=src_pos, tgt_pos=tgt_pos,
-                                                src_path=src_path, tgt_path=tgt_path)
+                    outputs, attns, outputs_path, attns_path = self.model(src, tgt, src_lengths, bptt=bptt,
+                                                                          with_align=self.with_align,
+                                                                          src_pos=src_pos, tgt_pos=tgt_pos,
+                                                                          src_path=src_path, tgt_path=tgt_path)
                 bptt = True
 
                 # 3. Compute loss.
@@ -485,6 +501,18 @@ class Trainer(object):
                         shard_size=self.shard_size,
                         trunc_start=j,
                         trunc_size=trunc_size)
+                    if self.train_path_loss is not None:
+                        path_loss, _batch_stats = self.train_path_loss(
+                            batch,
+                            outputs_path,
+                            attns_path,
+                            normalization=normalization,
+                            shard_size=self.shard_size,
+                            trunc_start=j,
+                            trunc_size=trunc_size)
+                        loss = loss + path_loss
+                        total_stats.update(_batch_stats)
+                        report_stats.update(_batch_stats)
 
                     if loss is not None:
                         self.optim.backward(loss)

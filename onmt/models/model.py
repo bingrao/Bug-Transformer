@@ -13,12 +13,10 @@ class NMTModel(nn.Module):
       decoder (onmt.decoders.DecoderBase): a decoder object
     """
 
-    def __init__(self, encoder, decoder, path_encoder=None, path_decoder=None):
+    def __init__(self, encoder, decoder):
         super(NMTModel, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
-        self.path_encoder = path_encoder
-        self.path_decoder = path_decoder
 
     def forward(self, src, tgt, lengths, bptt=False, with_align=False,
                 src_pos=None, tgt_pos=None, **kwargs):
@@ -51,7 +49,7 @@ class NMTModel(nn.Module):
         tgt_pos = tgt_pos[:-1] if tgt_pos is not None else tgt_pos
 
         src_path = kwargs.get('src_path', None)
-        if src_path is not None:
+        if src_path is not None and hasattr(self, 'path_encoder'):
             src_path_vec, src_path_state = self.path_encoder(src_path, src_len=src.size(0))
         else:
             src_path_vec = None
@@ -66,19 +64,20 @@ class NMTModel(nn.Module):
 
         tgt_path = kwargs.get('tgt_path', None)
         if src_path is not None and tgt_path is not None:
-            tgt_path_vec, tgt_path_attns = self.path_decoder(tgt_path,
-                                                             memory_bank=src_path_vec,
-                                                             memory_lengths=src_path[-2],
-                                                             tgt_len=dec_in.size(0))
+            tgt_path_vec, tgt_path_attns, tgt_path_output = self.path_decoder(tgt_path,
+                                                                              memory_bank=src_path_vec,
+                                                                              memory_lengths=src_path[-2],
+                                                                              tgt_len=dec_in.size(0))
         else:
             tgt_path_vec = None
             tgt_path_attns = None
+            tgt_path_output = None
 
         dec_out, attns = self.decoder(dec_in, memory_bank, position=tgt_pos,
                                       memory_lengths=lengths, with_align=with_align,
                                       tgt_path_vec=tgt_path_vec)
 
-        return dec_out, attns
+        return dec_out, attns, tgt_path_output, tgt_path_attns
 
     def update_dropout(self, dropout):
         self.encoder.update_dropout(dropout)
