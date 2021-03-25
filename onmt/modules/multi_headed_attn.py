@@ -120,11 +120,13 @@ class MultiHeadedAttention(nn.Module):
 
         def shape(x):
             """Projection."""
-            return x.view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+            return x.view(batch_size, -1, head_count, dim_per_head) \
+                .transpose(1, 2)
 
         def unshape(x):
             """Compute context."""
-            return x.transpose(1, 2).contiguous().view(batch_size, -1, head_count * dim_per_head)
+            return x.transpose(1, 2).contiguous() \
+                    .view(batch_size, -1, head_count * dim_per_head)
 
         # 1) Project key, value, and query.
         if layer_cache is not None:
@@ -218,7 +220,9 @@ class MultiHeadedAttention(nn.Module):
         # aeq(d, d_)
 
         # Return multi-head attn
-        attns = attn.view(batch_size, head_count, query_len, key_len)
+        attns = attn \
+            .view(batch_size, head_count,
+                  query_len, key_len)
 
         return output, attns
 

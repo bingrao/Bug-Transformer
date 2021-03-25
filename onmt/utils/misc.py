@@ -1,102 +1,24 @@
 # -*- coding: utf-8 -*-
-
 import torch
 import random
 import inspect
+import numpy as np
 from itertools import islice, repeat
 import os
-
 import functools
-import collections
-import copy
-import sys
-import heapq
-import io
-
-import numpy as np
-
 from subprocess import *
 import subprocess
 
-def jarWrapper(*args):
-    process = Popen(['scala', '-jar'] + list(args), stdout=PIPE, stderr=PIPE)
-    ret = []
-    while process.poll() is None:
-        line = process.stdout.readline()
-        if line != '' and line.endswith('\n'):
-            ret.append(line[:-1])
-    stdout, stderr = process.communicate()
-    ret += stdout.split('\n')
-    if stderr != '':
-        ret += stderr.split('\n')
-    ret.remove('')
-    return ret
 
-def call_subprocess(args):
-    return subprocess.call(args)
-
-
-
-
-
-class ClassRegistry(object):
-    """Helper class to create a registry of classes."""
-
-    def __init__(self, base_class=None):
-        """Initializes the class registry.
-
-    Args:
-      base_class: Ensure that classes added to this registry are a subclass of
-        :obj:`base_class`.
-    """
-        self._base_class = base_class
-        self._registry = {}
-
-    @property
-    def class_names(self):
-        """Class names registered in this registry."""
-        return set(self._registry.keys())
-
-    def register(self, cls=None, name=None, alias=None):
-        """Registers a class.
-
-    Args:
-      cls: The class to register. If not set, this method returns a decorator for
-        registration.
-      name: The class name. Defaults to ``cls.__name__``.
-      alias: An optional alias or list of alias for this class.
-
-    Returns:
-      :obj:`cls` if set, else a class decorator.
-
-    Raises:
-      TypeError: if :obj:`cls` does not extend the expected base class.
-      ValueError: if the class name is already registered.
-    """
-        if cls is None:
-            return functools.partial(self.register, name=name, alias=alias)
-        if self._base_class is not None and not issubclass(cls, self._base_class):
-            raise TypeError("Class %s does not extend %s" % (cls.__name__, self._base_class.__name__))
-        if name is None:
-            name = cls.__name__
-        self._register(cls, name)
-        if alias is not None:
-            if not isinstance(alias, (list, tuple)):
-                alias = (alias,)
-            for alias_name in alias:
-                self._register(cls, alias_name)
-        return cls
-
-    def _register(self, cls, name):
-        if name in self._registry:
-            raise ValueError("Class name %s is already registered" % name)
-        self._registry[name] = cls
-
-    def get(self, name):
-        """Returns the class with name :obj:`name` or ``None`` if it does not exist
-    in the registry.
-    """
-        return self._registry.get(name)
+def check_path(path, exist_ok=False, log=print):
+    """Check if `path` exists, makedirs if not else warning/IOError."""
+    if os.path.exists(path):
+        if exist_ok:
+            log(f"path {path} exists, may overwrite...")
+        else:
+            raise IOError(f"path {path} exists, stop.")
+    else:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
 
 
 def split_corpus(path, shard_size, default=None):
@@ -157,11 +79,11 @@ def tile(x, count, dim=0):
     out_size[0] *= count
     batch = x.size(0)
     x = x.view(batch, -1) \
-        .transpose(0, 1) \
-        .repeat(count, 1) \
-        .transpose(0, 1) \
-        .contiguous() \
-        .view(*out_size)
+         .transpose(0, 1) \
+         .repeat(count, 1) \
+         .transpose(0, 1) \
+         .contiguous() \
+         .view(*out_size)
     if dim != 0:
         x = x.permute(perm).contiguous()
     return x
@@ -172,7 +94,7 @@ def use_gpu(opt):
     Creates a boolean if gpu used
     """
     return (hasattr(opt, 'gpu_ranks') and len(opt.gpu_ranks) > 0) or \
-           (hasattr(opt, 'gpu') and opt.gpu > -1)
+        (hasattr(opt, 'gpu') and opt.gpu > -1)
 
 
 def set_random_seed(seed, is_cuda):
@@ -185,6 +107,8 @@ def set_random_seed(seed, is_cuda):
         # some cudnn methods can be random even after fixing the seed
         # unless you tell it to be deterministic
         torch.backends.cudnn.deterministic = True
+        # This one is needed for various tranfroms
+        np.random.seed(seed)
 
     if is_cuda and seed > 0:
         # These ensure same initialization in multi gpu mode
@@ -263,3 +187,83 @@ def check_model_config(model_config, root):
                         raise FileNotFoundError(
                             "{} from model {} does not exist".format(
                                 tok_path, model_config["id"]))
+
+
+
+def jarWrapper(*args):
+    process = Popen(['scala', '-jar'] + list(args), stdout=PIPE, stderr=PIPE)
+    ret = []
+    while process.poll() is None:
+        line = process.stdout.readline()
+        if line != '' and line.endswith('\n'):
+            ret.append(line[:-1])
+    stdout, stderr = process.communicate()
+    ret += stdout.split('\n')
+    if stderr != '':
+        ret += stderr.split('\n')
+    ret.remove('')
+    return ret
+
+
+def call_subprocess(args):
+    return subprocess.call(args)
+
+
+class ClassRegistry(object):
+    """Helper class to create a registry of classes."""
+
+    def __init__(self, base_class=None):
+        """Initializes the class registry.
+
+    Args:
+      base_class: Ensure that classes added to this registry are a subclass of
+        :obj:`base_class`.
+    """
+        self._base_class = base_class
+        self._registry = {}
+
+    @property
+    def class_names(self):
+        """Class names registered in this registry."""
+        return set(self._registry.keys())
+
+    def register(self, cls=None, name=None, alias=None):
+        """Registers a class.
+
+    Args:
+      cls: The class to register. If not set, this method returns a decorator for
+        registration.
+      name: The class name. Defaults to ``cls.__name__``.
+      alias: An optional alias or list of alias for this class.
+
+    Returns:
+      :obj:`cls` if set, else a class decorator.
+
+    Raises:
+      TypeError: if :obj:`cls` does not extend the expected base class.
+      ValueError: if the class name is already registered.
+    """
+        if cls is None:
+            return functools.partial(self.register, name=name, alias=alias)
+        if self._base_class is not None and not issubclass(cls, self._base_class):
+            raise TypeError("Class %s does not extend %s" % (cls.__name__, self._base_class.__name__))
+        if name is None:
+            name = cls.__name__
+        self._register(cls, name)
+        if alias is not None:
+            if not isinstance(alias, (list, tuple)):
+                alias = (alias,)
+            for alias_name in alias:
+                self._register(cls, alias_name)
+        return cls
+
+    def _register(self, cls, name):
+        if name in self._registry:
+            raise ValueError("Class name %s is already registered" % name)
+        self._registry[name] = cls
+
+    def get(self, name):
+        """Returns the class with name :obj:`name` or ``None`` if it does not exist
+    in the registry.
+    """
+        return self._registry.get(name)

@@ -237,7 +237,8 @@ class Trainer(object):
         for batch in iterator:
             batches.append(batch)
             if self.norm_method == "tokens":
-                num_tokens = batch.tgt[1:, :, 0].ne(self.train_loss.padding_idx).sum()
+                num_tokens = batch.tgt[1:, :, 0].ne(
+                    self.train_loss.padding_idx).sum()
                 normalization += num_tokens.item()
                 if self.train_path_loss is not None and hasattr(batch, 'tgt_path'):
                     _num_tokens = batch.tgt_path[0][:, 1:].ne(self.train_path_loss.padding_idx).sum()
@@ -281,7 +282,8 @@ class Trainer(object):
         Args:
             train_iter: A generator that returns the next training batch.
             train_steps: Run training for this many iterations.
-            save_checkpoint_steps: Save a checkpoint every this many iterations.
+            save_checkpoint_steps: Save a checkpoint every this many
+              iterations.
             valid_iter: A generator that returns the next validation batch.
             valid_steps: Run evaluation every this many iterations.
 
@@ -298,7 +300,8 @@ class Trainer(object):
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
 
-        for i, (batches, normalization, path_normalization) in enumerate(self._accum_batches(train_iter)):
+        for i, (batches, normalization, path_normalization) in enumerate(
+                self._accum_batches(train_iter)):
             step = self.optim.training_step
             # UPDATE DROPOUT
             self._maybe_update_dropout(step)
@@ -311,11 +314,16 @@ class Trainer(object):
                             % (self.gpu_rank, i + 1, len(batches)))
 
             if self.n_gpu > 1:
-                normalization = sum(onmt.utils.distributed.all_gather_list(normalization))
-                path_normalization = sum(onmt.utils.distributed.all_gather_list(path_normalization))
+                normalization = sum(onmt.utils.distributed
+                                    .all_gather_list
+                                    (normalization))
+                path_normalization = sum(onmt.utils.distributed
+                                         .all_gather_list
+                                         (path_normalization))
 
             # Here submit batch for training ...
-            self._gradient_accumulation(batches, normalization, path_normalization, total_stats, report_stats, step)
+            self._gradient_accumulation(
+                batches, normalization, path_normalization, total_stats, report_stats, step)
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)

@@ -1,13 +1,13 @@
 """Define RNN-based encoders."""
 import torch.nn as nn
 import torch.nn.functional as F
-import torch
+
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 from onmt.encoders.encoder import EncoderBase
 from onmt.utils.rnn_factory import rnn_factory
-
+import torch
 
 class RNNEncoder(EncoderBase):
     """ A generic recurrent neural network encoder.
@@ -60,13 +60,14 @@ class RNNEncoder(EncoderBase):
             embeddings,
             opt.bridge)
 
-    def forward(self, src, lengths=None, position=None, **kwargs):
+    def forward(self, src, lengths=None, **kwargs):
         """See :func:`EncoderBase.forward()`"""
         self._check_args(src, lengths)
         # [seq_len, batch_size, 1] --> [seq_len, batch_size, dim]
         emb = self.embeddings(src)
         # s_len, batch, emb_dim = emb.size()
 
+        position = kwargs.get("position", None)
         packed_emb = emb
         if lengths is not None and not self.no_pack_padded_seq:
             # Lengths data is wrapped inside a Tensor.
@@ -101,7 +102,6 @@ class RNNEncoder(EncoderBase):
 
     def _bridge(self, hidden):
         """Forward hidden state through bridge."""
-
         def bottle_hidden(linear, states):
             """
             Transform from 3D to 2D, apply linear and return initial size
@@ -169,10 +169,11 @@ class PathRNNEncoder(EncoderBase):
             embeddings=embeddings,
             use_bridge=opt.bridge)
 
-    def forward(self, src, lengths=None, position=None, **kwargs):
+    def forward(self, src, lengths=None, **kwargs):
         # x_path [b*l, p], torch.Size([3901, 16]), The padded of each AST path
         # x_example_len [b], torch.Size([83]), The number of paths (l) for each example in a batch
         # x_path_len [b*l], The number of AST nodes (k) for each path
+
         x_path, x_example_len, x_path_len = src
 
         x_path_len, perm_idx = x_path_len.sort(0, descending=True)

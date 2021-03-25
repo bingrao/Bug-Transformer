@@ -13,65 +13,6 @@ from onmt.utils.logging import logger
 from torch.autograd import Variable
 
 
-class FocalLoss(nn.Module):
-    r"""
-        This criterion is a implemenation of Focal Loss, which is proposed in
-        Focal Loss for Dense Object Detection.
-
-            Loss(x, class) = - \alpha (1-softmax(x)[class])^gamma \log(softmax(x)[class])
-
-        The losses are averaged across observations for each minibatch.
-
-        Args:
-            alpha(1D Tensor, Variable) : the scalar factor for this criterion
-            gamma(float, double) : gamma > 0; reduces the relative loss for well-classiﬁed examples (p > .5),
-                                   putting more focus on hard, misclassiﬁed examples
-            size_average(bool): By default, the losses are averaged over observations for each minibatch.
-                                However, if the field size_average is set to False, the losses are
-                                instead summed for each minibatch.
-
-
-    """
-
-    def __init__(self, class_num, ignore_index, alpha=None, gamma=2, isLearnable=True, reduction='elementwise_mean'):
-        assert reduction in ['elementwise_mean', 'sum', 'none']
-        super(FocalLoss, self).__init__()
-        if isLearnable:
-            self.alpha = Variable(torch.ones(class_num, 1), requires_grad=True)
-        else:
-            self.alpha = Variable(torch.ones(class_num, 1).fill_(alpha), requires_grad=False)
-        self.ignore_index = ignore_index
-        self.gamma = gamma
-        self.class_num = class_num
-        self.reduction = reduction
-
-    def forward(self, inputs, targets):
-        N = inputs.size(0)
-        C = inputs.size(1)
-        P = F.softmax(inputs, dim=1)
-
-        class_mask = inputs.data.new(N, C).fill_(0)
-        class_mask = Variable(class_mask)
-        ids = targets.view(-1, 1)
-        class_mask.scatter_(1, ids.data, 1.)
-
-        if inputs.is_cuda and not self.alpha.is_cuda:
-            self.alpha = self.alpha.cuda()
-        alpha = self.alpha[ids.data.view(-1)]
-
-        probs = (P * class_mask).sum(1).view(-1, 1)
-
-        log_p = probs.log()
-
-        batch_loss = -alpha * (torch.pow((1 - probs), self.gamma)) * log_p
-
-        if self.reduction == 'sum':
-            loss = batch_loss.sum()
-        elif self.reduction == 'elementwise_mean':
-            loss = batch_loss.mean()
-        return loss
-
-
 def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
     """
     Returns a LossCompute subclass which wraps around an nn.Module subclass
@@ -165,7 +106,7 @@ class LossComputeBase(nn.Module):
     def padding_idx(self):
         return self.criterion.ignore_index
 
-    def _make_shard_state(self, batch, output, range_, attns=None, output_path=None):
+    def _make_shard_state(self, batch, output, range_, attns=None):
         """
         Make shard state dictionary for shards() to return iterable
         shards for efficient loss computation. Subclass must define
@@ -248,11 +189,7 @@ class LossComputeBase(nn.Module):
             #     logger.info(f"[********] The match loss is : {match_loss} -- {loss}")
 
             # loss = loss - match_loss * 0.001
-            if idx == 0 and not self.path_loss:
-                loss.backward(retain_graph=True)
-            else:
-                loss.backward()
-
+            loss.backward()
             batch_stats.update(stats)
         return None, batch_stats
 
@@ -310,74 +247,34 @@ class LabelSmoothingLoss(nn.Module):
         return F.kl_div(output, model_prob, reduction='sum')
 
 
-class NMTLossCompute(LossComputeBase):
+class CommonLossCompute(LossComputeBase):
     """
-    Standard NMT Loss Computation.
-    """
+    Loss Computation parent for NMTLossCompute and LMLossCompute
 
+    Implement loss compatible with coverage and alignement shards
+    """
     def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0, path_loss=False):
-        super(NMTLossCompute, self).__init__(criterion, generator, path_loss)
+                 lambda_coverage=0.0, lambda_align=0.0, tgt_shift_index=1, path_loss=False):
+        super(CommonLossCompute, self).__init__(criterion, generator, path_loss)
         self.lambda_coverage = lambda_coverage
         self.lambda_align = lambda_align
+        self.tgt_shift_index = tgt_shift_index
 
-    def _make_shard_state(self, batch, output, range_, attns=None, output_path=None):
-        """
-
-        :param batch:
-        :param output: output.shape: [tgt_len, batch_size, dim] e.g. torch.Size([67, 61, 512])
-        :param range_:
-        :param attns:
-        :return:
-        """
-        shard_state = {
-            # output.shape: [tgt_len, batch_size, dim] e.g.torch.Size([67, 61, 512])
-            # target.shape: [tgt_len, batch_size] e.g.torch.Size([67, 61])
-            "output": output,
-        }
-
-        if self.path_loss and hasattr(batch, 'tgt_path'):
-            shard_state['target'] = batch.tgt_path[0].transpose(0, 1).contiguous()
-        else:
-            shard_state["target"] = batch.tgt[range_[0] + 1: range_[1], :, 0].contiguous()
-
-        if self.lambda_coverage != 0.0:
-            coverage = attns.get("coverage", None)
-            std = attns.get("std", None)
-            assert attns is not None
-            assert std is not None, "lambda_coverage != 0.0 requires " \
-                                    "attention mechanism"
-            assert coverage is not None, "lambda_coverage != 0.0 requires " \
-                                         "coverage attention"
-
-            shard_state.update({
-                "std_attn": attns.get("std"),
-                "coverage_attn": coverage
-            })
-        if self.lambda_align != 0.0:
-            # attn_align should be in (batch_size, pad_tgt_size, pad_src_size)
-            attn_align = attns.get("align", None)
-            # align_idx should be a Tensor in size([N, 3]), N is total number
-            # of align src-tgt pair in current batch, each as
-            # ['sent_N°_in_batch', 'tgt_id+1', 'src_id'] (check AlignField)
-            align_idx = batch.align
-            assert attns is not None
-            assert attn_align is not None, "lambda_align != 0.0 requires " \
-                                           "alignement attention head"
-            assert align_idx is not None, "lambda_align != 0.0 requires " \
-                                          "provide guided alignement"
-            pad_tgt_size, batch_size, _ = batch.tgt.size()
-            pad_src_size = batch.src[0].size(0)
-            align_matrix_size = [batch_size, pad_tgt_size, pad_src_size]
-            ref_align = onmt.utils.make_batch_align_matrix(
-                align_idx, align_matrix_size, normalize=True)
-            # NOTE: tgt-src ref alignement that in range_ of shard
-            # (coherent with batch.tgt)
-            shard_state.update({
-                "align_head": attn_align,
-                "ref_align": ref_align[:, range_[0] + 1: range_[1], :]
-            })
-        return shard_state
+    def _add_coverage_shard_state(self, shard_state, attns):
+        coverage = attns.get("coverage", None)
+        std = attns.get("std", None)
+        assert attns is not None
+        assert coverage is not None, (
+            "lambda_coverage != 0.0 requires coverage attention"
+            " that could not be found in the model."
+            " Transformer decoders do not implement coverage"
+        )
+        assert std is not None, (
+            "lambda_coverage != 0.0 requires attention mechanism"
+            " that could not be found in the model."
+        )
+        shard_state.update({"std_attn": attns.get("std"),
+                            "coverage_attn": coverage})
 
     def _compute_loss(self, batch, output, target, std_attn=None,
                       coverage_attn=None, align_head=None, ref_align=None):
@@ -427,6 +324,36 @@ class NMTLossCompute(LossComputeBase):
         covloss *= self.lambda_coverage
         return covloss
 
+    def _add_align_shard_state(self, shard_state, batch, range_start,
+                               range_end, attns):
+        # attn_align should be in (batch_size, pad_tgt_size, pad_src_size)
+        attn_align = attns.get("align", None)
+        # align_idx should be a Tensor in size([N, 3]), N is total number
+        # of align src-tgt pair in current batch, each as
+        # ['sent_N°_in_batch', 'tgt_id+1', 'src_id'] (check AlignField)
+        align_idx = batch.align
+        assert attns is not None
+        assert attn_align is not None, (
+            "lambda_align != 0.0 requires " "alignement attention head"
+        )
+        assert align_idx is not None, (
+            "lambda_align != 0.0 requires " "provide guided alignement"
+        )
+        pad_tgt_size, batch_size, _ = batch.tgt.size()
+        pad_src_size = batch.src[0].size(0)
+        align_matrix_size = [batch_size, pad_tgt_size, pad_src_size]
+        ref_align = onmt.utils.make_batch_align_matrix(
+            align_idx, align_matrix_size, normalize=True
+        )
+        # NOTE: tgt-src ref alignement that in range_ of shard
+        # (coherent with batch.tgt)
+        shard_state.update(
+            {
+                "align_head": attn_align,
+                "ref_align": ref_align[:, range_start:range_end, :],
+            }
+        )
+
     def _compute_alignement_loss(self, align_head, ref_align):
         """Compute loss between 2 partial alignment matrix."""
         # align_head contains value in [0, 1) presenting attn prob,
@@ -436,6 +363,62 @@ class NMTLossCompute(LossComputeBase):
         align_loss = -align_head.clamp(min=1e-18).log().mul(ref_align).sum()
         align_loss *= self.lambda_align
         return align_loss
+
+    def _make_shard_state(self, batch, output, range_, attns=None):
+        """
+
+        :param batch:
+        :param output: output.shape: [tgt_len, batch_size, dim] e.g. torch.Size([67, 61, 512])
+        :param range_:
+        :param attns:
+        :return:
+        """
+        range_start = range_[0] + self.tgt_shift_index
+        range_end = range_[1]
+        shard_state = {
+            # output.shape: [tgt_len, batch_size, dim] e.g.torch.Size([67, 61, 512])
+            # target.shape: [tgt_len, batch_size] e.g.torch.Size([67, 61])
+            "output": output,
+        }
+
+        if self.path_loss and hasattr(batch, 'tgt_path'):
+            shard_state['target'] = batch.tgt_path[0].transpose(0, 1).contiguous()
+        else:
+            shard_state["target"] = batch.tgt[range_[0] + 1: range_[1], :, 0].contiguous()
+
+        if self.lambda_coverage != 0.0:
+            self._add_coverage_shard_state(shard_state, attns)
+        if self.lambda_align != 0.0:
+            self._add_align_shard_state(
+                shard_state, batch, range_start, range_end, attns
+            )
+        return shard_state
+
+
+class NMTLossCompute(CommonLossCompute):
+    """
+    Standard NMT Loss Computation.
+    """
+    def __init__(self, criterion, generator, normalization="sents",
+                 lambda_coverage=0.0, lambda_align=0.0, path_loss=False):
+        super(NMTLossCompute, self).__init__(criterion, generator,
+                                             normalization=normalization,
+                                             lambda_coverage=lambda_coverage,
+                                             lambda_align=lambda_align,
+                                             tgt_shift_index=1, path_loss=path_loss)
+
+
+class LMLossCompute(CommonLossCompute):
+    """
+    Standard LM Loss Computation.
+    """
+    def __init__(self, criterion, generator, normalization="sents",
+                 lambda_coverage=0.0, lambda_align=0.0, path_loss=False):
+        super(LMLossCompute, self).__init__(criterion, generator,
+                                            normalization=normalization,
+                                            lambda_coverage=lambda_coverage,
+                                            lambda_align=lambda_align,
+                                            tgt_shift_index=0, path_loss=path_loss)
 
 
 def filter_shard_state(state, shard_size=None):
@@ -506,3 +489,62 @@ def shards(state, shard_size, eval_only=False):
 def get_max_match_greedy_decode(probability, target):
     _, next_word = torch.max(probability, dim=1)
     return torch.sum(torch.eq(next_word, target) == True)
+
+
+class FocalLoss(nn.Module):
+    r"""
+        This criterion is a implemenation of Focal Loss, which is proposed in
+        Focal Loss for Dense Object Detection.
+
+            Loss(x, class) = - \alpha (1-softmax(x)[class])^gamma \log(softmax(x)[class])
+
+        The losses are averaged across observations for each minibatch.
+
+        Args:
+            alpha(1D Tensor, Variable) : the scalar factor for this criterion
+            gamma(float, double) : gamma > 0; reduces the relative loss for well-classiﬁed examples (p > .5),
+                                   putting more focus on hard, misclassiﬁed examples
+            size_average(bool): By default, the losses are averaged over observations for each minibatch.
+                                However, if the field size_average is set to False, the losses are
+                                instead summed for each minibatch.
+
+
+    """
+
+    def __init__(self, class_num, ignore_index, alpha=None, gamma=2, isLearnable=True, reduction='elementwise_mean'):
+        assert reduction in ['elementwise_mean', 'sum', 'none']
+        super(FocalLoss, self).__init__()
+        if isLearnable:
+            self.alpha = Variable(torch.ones(class_num, 1), requires_grad=True)
+        else:
+            self.alpha = Variable(torch.ones(class_num, 1).fill_(alpha), requires_grad=False)
+        self.ignore_index = ignore_index
+        self.gamma = gamma
+        self.class_num = class_num
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        N = inputs.size(0)
+        C = inputs.size(1)
+        P = F.softmax(inputs, dim=1)
+
+        class_mask = inputs.data.new(N, C).fill_(0)
+        class_mask = Variable(class_mask)
+        ids = targets.view(-1, 1)
+        class_mask.scatter_(1, ids.data, 1.)
+
+        if inputs.is_cuda and not self.alpha.is_cuda:
+            self.alpha = self.alpha.cuda()
+        alpha = self.alpha[ids.data.view(-1)]
+
+        probs = (P * class_mask).sum(1).view(-1, 1)
+
+        log_p = probs.log()
+
+        batch_loss = -alpha * (torch.pow((1 - probs), self.gamma)) * log_p
+
+        if self.reduction == 'sum':
+            loss = batch_loss.sum()
+        elif self.reduction == 'elementwise_mean':
+            loss = batch_loss.mean()
+        return loss

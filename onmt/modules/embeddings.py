@@ -9,6 +9,8 @@ from onmt.modules.util_class import Elementwise
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from onmt.encoders.rnn_encoder import PathRNNEncoder
+class SequenceTooLongError(Exception):
+    pass
 
 
 class PositionalEncoding(nn.Module):
@@ -29,7 +31,7 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros(max_len, dim)
         position = torch.arange(0, max_len).unsqueeze(1)
         div_term = torch.exp((torch.arange(0, dim, 2, dtype=torch.float) *
-                              -(math.log(10000.0) / dim)))
+                             -(math.log(10000.0) / dim)))
         pe[:, 0::2] = torch.sin(position.float() * div_term)
         pe[:, 1::2] = torch.cos(position.float() * div_term)
         pe = pe.unsqueeze(1)

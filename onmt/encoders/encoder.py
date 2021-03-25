@@ -40,7 +40,7 @@ class EncoderBase(nn.Module):
             n_batch_, = lengths.size()
             aeq(n_batch, n_batch_)
 
-    def forward(self, src, lengths=None, position=None, **kwargs):
+    def forward(self, src, lengths=None, **kwargs):
         """
         Args:
             src (LongTensor):
@@ -49,13 +49,11 @@ class EncoderBase(nn.Module):
 
 
         Returns:
-            (FloatTensor, FloatTensor):
+            (FloatTensor, FloatTensor, FloatTensor):
 
             * final encoder state, used to initialize decoder
             * memory bank for attention, ``(src_len, batch, hidden)``
-            :param src:
-            :param lengths:
-            :param position:
+            * lengths
         """
 
         raise NotImplementedError

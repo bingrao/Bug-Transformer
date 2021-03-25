@@ -6,6 +6,7 @@ import torch
 from torchtext.data import Field, RawField
 
 from onmt.inputters.datareader_base import DataReaderBase
+from onmt.constants import DefaultTokens
 
 
 def expand_path(position, d_model):
@@ -279,9 +280,9 @@ def path_fields(**kwargs):
     n_feats = kwargs["n_feats"]
     include_lengths = kwargs["include_lengths"]
     base_name = kwargs["base_name"]
-    pad = kwargs.get("pad", "<blank>")
-    bos = kwargs.get("bos", "<s>")
-    eos = kwargs.get("eos", "</s>")
+    pad = kwargs.get("pad", DefaultTokens.PAD)
+    bos = kwargs.get("bos", DefaultTokens.BOS)
+    eos = kwargs.get("eos", DefaultTokens.EOS)
     path_vec_size = kwargs.get("path_vec_size", 256)
     truncate = kwargs.get("truncate", None)
     fields_ = []
