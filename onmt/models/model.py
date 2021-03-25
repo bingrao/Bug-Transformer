@@ -59,11 +59,11 @@ class NMTModel(nn.Module):
 
         if bptt is False:
             self.decoder.init_state(src, memory_bank, enc_state)
-            if src_path is not None and self.path_decoder is not None:
+            if src_path is not None and hasattr(self, "path_decoder"):
                 self.path_decoder.init_state(src_path, src_path_vec, src_path_state)
 
         tgt_path = kwargs.get('tgt_path', None)
-        if src_path is not None and tgt_path is not None:
+        if src_path is not None and tgt_path is not None and hasattr(self, 'path_decoder'):
             tgt_path_vec, tgt_path_attns, tgt_path_output = self.path_decoder(tgt_path,
                                                                               memory_bank=src_path_vec,
                                                                               memory_lengths=lengths,

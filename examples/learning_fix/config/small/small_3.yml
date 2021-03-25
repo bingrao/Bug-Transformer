@@ -86,6 +86,6 @@ translate:
   share_vocab: True
   min_length: 0
   max_length: 100
-  batch_size: 16
-  gpu: 1
+  batch_size: 512
+  gpu: 0
 #  report_align: 'true'

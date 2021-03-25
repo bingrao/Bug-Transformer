@@ -42,17 +42,14 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
     tgt_field = dict(fields)["tgt"].base_field
     train_loss = onmt.utils.loss.build_loss_compute(model, tgt_field, opt)
     valid_loss = onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=False)
-
-    if "tgt_path" in fields and opt.path_encoding:
-        train_path_loss = onmt.utils.loss.build_loss_compute(model,
-                                                             dict(fields)["tgt_path"].base_field,
-                                                             opt, path_loss=True)
-        valid_path_loss = onmt.utils.loss.build_loss_compute(model,
-                                                             dict(fields)["tgt_path"].base_field,
-                                                             opt, train=False, path_loss=True)
-    else:
-        train_path_loss, valid_path_loss = None, None
-
+    train_path_loss, valid_path_loss = None, None
+    # if "tgt_path" in fields and opt.path_encoding:
+    #     train_path_loss = onmt.utils.loss.build_loss_compute(model,
+    #                                                          dict(fields)["tgt_path"].base_field,
+    #                                                          opt, path_loss=True)
+    #     valid_path_loss = onmt.utils.loss.build_loss_compute(model,
+    #                                                          dict(fields)["tgt_path"].base_field,
+    #                                                          opt, train=False, path_loss=True)
     trunc_size = opt.truncated_decoder  # Badly named...
     shard_size = opt.max_generator_batches if opt.model_dtype == 'fp32' else 0
     norm_method = opt.normalization

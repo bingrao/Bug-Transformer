@@ -208,8 +208,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
             path_generator[0].weight = path_decoder.embeddings.word_lut.weight
 
         model.path_encoder = path_encoder
-        model.path_decoder = path_decoder
-        model.path_generator = path_generator
+        # model.path_decoder = path_decoder
+        # model.path_generator = path_generator
 
     # Build Generator.
     if not model_opt.copy_attn:

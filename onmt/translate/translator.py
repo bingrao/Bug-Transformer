@@ -167,6 +167,7 @@ class Translator(object):
 
         self.tgt_path_reader = kwargs.get('tgt_path_reader', None)
         self.src_path_reader = kwargs.get('src_path_reader', None)
+        self.path_encoding = kwargs.get('path_encoding', False)
 
         self.replace_unk = replace_unk
         if self.replace_unk and not self.model.decoder.attentional:
@@ -277,7 +278,8 @@ class Translator(object):
             logger=logger,
             seed=opt.seed,
             src_path_reader=src_path_reader,
-            tgt_path_reader=tgt_path_reader)
+            tgt_path_reader=tgt_path_reader,
+            path_encoding=model_opt.path_encoding)
 
     def _log(self, msg):
         if self.logger:
@@ -574,8 +576,7 @@ class Translator(object):
                     exclusion_tokens=self._exclusion_idxs,
                     stepwise_penalty=self.stepwise_penalty,
                     ratio=self.ratio)
-            return self._translate_batch_with_strategy(batch, src_vocabs,
-                                                       decode_strategy)
+            return self._translate_batch_with_strategy(batch, src_vocabs, decode_strategy)
 
     def _run_encoder(self, batch, src_path_vec=None):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) \
@@ -695,7 +696,6 @@ class Translator(object):
         batch_size = batch.batch_size
 
         # (1) Run the encoder on the src.
-
         if hasattr(batch, 'src_path') and hasattr(self.model, 'path_encoder'):
             if isinstance(batch.src, tuple):
                 src, _ = batch.src
@@ -727,14 +727,14 @@ class Translator(object):
         if fn_map_state is not None:
             self.model.decoder.map_state(fn_map_state)
 
-        decoder_input_path = None
         # (3) Begin decoding step by step:
+        decoder_input_path = None
         for step in range(decode_strategy.max_length):
             # get last decoder output as current input from decode_strategy
             # decoder_input: (tgt_len = 1, batch_size*beam_size, nfeats = 1)
             decoder_input = decode_strategy.current_predictions.view(1, -1, 1)
 
-            if hasattr(self.model, 'path_decoder') is not None and hasattr(batch, "src_path"):
+            if self.path_encoding and hasattr(self.model, 'path_decoder') is not None and hasattr(batch, "src_path"):
                 tgt_path = self.model.path_decoder.embeddings.get_init_embedding(decoder_input.size(1),
                                                                                  decoder_input_path)
                 tgt_path = [t.to(src_path_vec.device) for t in tgt_path]
@@ -748,6 +748,7 @@ class Translator(object):
             else:
                 decoder_input_path = None
 
+            # decoder_input_path = None
             # cacluate probability for each output token
             # log_probs: (tgt_len = 1, batch_size*beam_size, vocab_size=415)
             # attn: (tgt_len, batch_size*beam_size, src_len=70)
@@ -779,9 +780,12 @@ class Translator(object):
                 else:
                     memory_bank = memory_bank.index_select(1, select_indices)
 
-                src_path_vec = src_path_vec.index_select(0, select_indices)
+                if src_path_vec is not None:
+                    src_path_vec = src_path_vec.index_select(0, select_indices)
                 memory_lengths = memory_lengths.index_select(0, select_indices)
-                decoder_input_path = decoder_input_path.index_select(1, select_indices)
+
+                if decoder_input_path is not None:
+                    decoder_input_path = decoder_input_path.index_select(1, select_indices)
 
                 if src_map is not None:
                     src_map = src_map.index_select(1, select_indices)
@@ -789,8 +793,10 @@ class Translator(object):
             if parallel_paths > 1 or any_finished:
                 self.model.decoder.map_state(
                     lambda state, dim: state.index_select(dim, select_indices))
-                self.model.path_decoder.map_state(
-                    lambda state, dim: state.index_select(dim, select_indices))
+
+                if hasattr(self.model, 'path_decoder') is not None and hasattr(batch, "src_path"):
+                    self.model.path_decoder.map_state(
+                        lambda state, dim: state.index_select(dim, select_indices))
 
         results["scores"] = decode_strategy.scores
         results["predictions"] = decode_strategy.predictions
