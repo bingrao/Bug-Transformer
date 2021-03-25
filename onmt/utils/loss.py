@@ -402,7 +402,9 @@ class NMTLossCompute(LossComputeBase):
         gtruth = target.view(-1)
 
         match_loss = get_max_match_greedy_decode(scores, gtruth).div(float(gtruth.shape[0]))
-        # scores [shard_size*batch_size, vocab_size], torch.Size([166, 558]), gtruth: [shard_size*batch_size], torch.Size([166])
+
+        # scores [shard_size*batch_size, vocab_size], torch.Size([166, 558]),
+        # gtruth: [shard_size*batch_size], torch.Size([166])
         loss = self.criterion(scores, gtruth)
         if self.lambda_coverage != 0.0:
             coverage_loss = self._compute_coverage_loss(

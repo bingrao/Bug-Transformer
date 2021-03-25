@@ -43,13 +43,13 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
     train_loss = onmt.utils.loss.build_loss_compute(model, tgt_field, opt)
     valid_loss = onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=False)
     train_path_loss, valid_path_loss = None, None
-    # if "tgt_path" in fields and opt.path_encoding:
-    #     train_path_loss = onmt.utils.loss.build_loss_compute(model,
-    #                                                          dict(fields)["tgt_path"].base_field,
-    #                                                          opt, path_loss=True)
-    #     valid_path_loss = onmt.utils.loss.build_loss_compute(model,
-    #                                                          dict(fields)["tgt_path"].base_field,
-    #                                                          opt, train=False, path_loss=True)
+    if "tgt_path" in fields and opt.path_encoding:
+        train_path_loss = onmt.utils.loss.build_loss_compute(model,
+                                                             dict(fields)["tgt_path"].base_field,
+                                                             opt, path_loss=True)
+        valid_path_loss = onmt.utils.loss.build_loss_compute(model,
+                                                             dict(fields)["tgt_path"].base_field,
+                                                             opt, train=False, path_loss=True)
     trunc_size = opt.truncated_decoder  # Badly named...
     shard_size = opt.max_generator_batches if opt.model_dtype == 'fp32' else 0
     norm_method = opt.normalization
@@ -232,22 +232,27 @@ class Trainer(object):
     def _accum_batches(self, iterator):
         batches = []
         normalization = 0
+        path_normalization = 0
         self.accum_count = self._accum_count(self.optim.training_step)
         for batch in iterator:
             batches.append(batch)
             if self.norm_method == "tokens":
-                num_tokens = batch.tgt[1:, :, 0].ne(
-                    self.train_loss.padding_idx).sum()
+                num_tokens = batch.tgt[1:, :, 0].ne(self.train_loss.padding_idx).sum()
                 normalization += num_tokens.item()
+                if self.train_path_loss is not None and hasattr(batch, 'tgt_path'):
+                    _num_tokens = batch.tgt_path[0][:, 1:].ne(self.train_path_loss.padding_idx).sum()
+                    path_normalization += num_tokens.item()
             else:
                 normalization += batch.batch_size
+                if self.train_path_loss is not None:
+                    path_normalization += batch.batch_size
             if len(batches) == self.accum_count:
-                yield batches, normalization
+                yield batches, normalization, path_normalization
                 self.accum_count = self._accum_count(self.optim.training_step)
                 batches = []
                 normalization = 0
         if batches:
-            yield batches, normalization
+            yield batches, normalization, path_normalization
 
     def _update_average(self, step):
         if self.moving_average is None:
@@ -293,7 +298,7 @@ class Trainer(object):
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
 
-        for i, (batches, normalization) in enumerate(self._accum_batches(train_iter)):
+        for i, (batches, normalization, path_normalization) in enumerate(self._accum_batches(train_iter)):
             step = self.optim.training_step
             # UPDATE DROPOUT
             self._maybe_update_dropout(step)
@@ -307,9 +312,10 @@ class Trainer(object):
 
             if self.n_gpu > 1:
                 normalization = sum(onmt.utils.distributed.all_gather_list(normalization))
+                path_normalization = sum(onmt.utils.distributed.all_gather_list(path_normalization))
 
             # Here submit batch for training ...
-            self._gradient_accumulation(batches, normalization, total_stats, report_stats, step)
+            self._gradient_accumulation(batches, normalization, path_normalization, total_stats, report_stats, step)
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)
@@ -437,7 +443,7 @@ class Trainer(object):
 
         return stats, metric_scores
 
-    def _gradient_accumulation(self, true_batches, normalization, total_stats, report_stats, step):
+    def _gradient_accumulation(self, true_batches, normalization, path_normalization, total_stats, report_stats, step):
         if self.accum_count > 1:
             self.optim.zero_grad()
 
@@ -511,13 +517,13 @@ class Trainer(object):
                             batch,
                             outputs_path,
                             attns_path,
-                            normalization=normalization,
+                            normalization=path_normalization,
                             shard_size=self.shard_size,
                             trunc_start=j,
                             trunc_size=trunc_size)
                         loss = loss + path_loss
-                        total_stats.update(_batch_stats)
-                        report_stats.update(_batch_stats)
+                        # total_stats.update(_batch_stats)
+                        # report_stats.update(_batch_stats)
 
                     if loss is not None:
                         self.optim.backward(loss)

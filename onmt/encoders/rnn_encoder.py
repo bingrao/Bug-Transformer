@@ -175,16 +175,18 @@ class PathRNNEncoder(EncoderBase):
         # x_path_len [b*l], The number of AST nodes (k) for each path
         x_path, x_example_len, x_path_len = src
 
-        emb = self.embeddings(x_path.unsqueeze(-1))
-        emb = emb.transpose(0, 1)
+        x_path_len, perm_idx = x_path_len.sort(0, descending=True)
+        x_path = x_path[perm_idx]
+        emb = self.embeddings(x_path.unsqueeze(-1)).transpose(0, 1)
         if lengths is None:
             lengths = x_path_len
 
         packed_emb = emb
         if lengths is not None and not self.no_pack_padded_seq:
             # Lengths data is wrapped inside a Tensor.
+            # https://gist.github.com/HarshTrivedi/f4e7293e941b17d19058f6fb90ab0fec
             lengths_list = lengths.view(-1).tolist()
-            packed_emb = pack(emb, lengths_list, enforce_sorted=False)
+            packed_emb = pack(emb, lengths_list)
 
         # memory_bank, [p, b*l, dim], torch.Size([16, 3901, 512])
         # state -> [hidden, cell], [1, b*l, dim], torch.Size([1, 3901, 512])
@@ -192,6 +194,11 @@ class PathRNNEncoder(EncoderBase):
 
         if lengths is not None and not self.no_pack_padded_seq:
             memory_bank, _ = unpack(memory_bank)
+
+        sorted_idx, reversed_perm_idx = perm_idx.sort(0)
+        final_hidden = final_hidden[:, reversed_perm_idx, :]
+        final_cell = final_cell[:, reversed_perm_idx, :]
+        memory_bank = memory_bank[:, reversed_perm_idx, :]
 
         if self.use_bridge:
             final_hidden, final_cell = self._bridge((final_hidden, final_cell))
