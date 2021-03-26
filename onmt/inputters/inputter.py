@@ -11,6 +11,7 @@ import torch
 import torchtext.data
 from torchtext.data import Field, RawField, LabelField
 from torchtext.vocab import Vocab
+from onmt.constants import DefaultTokens, ModelTask
 from torchtext.data.utils import RandomShuffler
 
 from onmt.inputters.text_dataset import text_fields, TextMultiField
@@ -102,17 +103,18 @@ def parse_align_idx(align_pharaoh):
 
 
 def get_fields(
-        src_data_type,
-        n_src_feats,
-        n_tgt_feats,
-        pad='<blank>',
-        bos='<s>',
-        eos='</s>',
-        dynamic_dict=False,
-        with_align=False,
-        src_truncate=None,
-        tgt_truncate=None,
-        opt=None
+    src_data_type,
+    n_src_feats,
+    n_tgt_feats,
+    pad=DefaultTokens.PAD,
+    bos=DefaultTokens.BOS,
+    eos=DefaultTokens.EOS,
+    dynamic_dict=False,
+    with_align=False,
+    src_truncate=None,
+    tgt_truncate=None,
+    data_task=ModelTask.SEQ2SEQ,
+    opt=None
 ):
     """
     Args:
@@ -135,7 +137,7 @@ def get_fields(
             ``src_data_type``'s data reader - see there for more details).
         tgt_truncate: Cut off tgt sequences beyond this (passed to
             :class:`TextDataReader` - see there for more details).
-
+        data_task:
     Returns:
         A dict mapping names to fields. These names need to match
         the dataset example attributes.
@@ -155,12 +157,15 @@ def get_fields(
                       "code": text_fields,
                       "path": path_fields}
 
-    src_field_kwargs = {"n_feats": n_src_feats,
-                        "include_lengths": True,
-                        "pad": pad, "bos": None, "eos": None,
-                        "truncate": src_truncate,
-                        "base_name": "src"}
-
+    src_field_kwargs = {
+        "n_feats": n_src_feats,
+        "include_lengths": True,
+        "pad": pad,
+        "bos": None,
+        "eos": None,
+        "truncate": src_truncate,
+        "base_name": "src",
+    }
     fields["src"] = fields_getters[src_data_type](**src_field_kwargs)
 
     if opt is not None and src_data_type == 'code' and (opt.train_src_pos is not None or opt.valid_src_pos is not None):
@@ -172,7 +177,8 @@ def get_fields(
                                 "base_name": "src_pos"}
         fields["src_pos"] = fields_getters["position"](**src_pos_field_kwargs)
 
-    if opt is not None and src_data_type == 'code' and (opt.train_src_path is not None or opt.valid_src_path is not None):
+    if opt is not None and src_data_type == 'code' and (
+            opt.train_src_path is not None or opt.valid_src_path is not None):
         src_path_field_kwargs = {"n_feats": n_src_feats,
                                  "include_lengths": True,
                                  "pad": pad, "bos": None, "eos": eos,
@@ -181,11 +187,15 @@ def get_fields(
                                  "base_name": "src_path"}
         fields["src_path"] = fields_getters["path"](**src_path_field_kwargs)
 
-    tgt_field_kwargs = {"n_feats": n_tgt_feats,
-                        "include_lengths": False,
-                        "pad": pad, "bos": bos, "eos": eos,
-                        "truncate": tgt_truncate,
-                        "base_name": "tgt"}
+    tgt_field_kwargs = {
+        "n_feats": n_tgt_feats,
+        "include_lengths": False,
+        "pad": pad,
+        "bos": bos,
+        "eos": eos,
+        "truncate": tgt_truncate,
+        "base_name": "tgt",
+    }
 
     if src_data_type == 'code':
         fields["tgt"] = fields_getters["code"](**tgt_field_kwargs)
@@ -201,7 +211,8 @@ def get_fields(
                                 "base_name": "tgt_pos"}
         fields["tgt_pos"] = fields_getters["position"](**tgt_pos_field_kwargs)
 
-    if opt is not None and src_data_type == 'code' and (opt.train_tgt_path is not None or opt.valid_tgt_path is not None):
+    if opt is not None and src_data_type == 'code' and (
+            opt.train_tgt_path is not None or opt.valid_tgt_path is not None):
         tgt_path_field_kwargs = {"n_feats": n_tgt_feats,
                                  "include_lengths": False,
                                  "pad": pad, "bos": bos, "eos": eos,

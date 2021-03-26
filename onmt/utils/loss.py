@@ -2,15 +2,15 @@
 This includes: LossComputeBase and the standard NMTLossCompute, and
                sharded loss compute stuff.
 """
-from __future__ import division
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 import onmt
 from onmt.modules.sparse_losses import SparsemaxLoss
 from onmt.modules.sparse_activations import LogSparsemax
-from onmt.utils.logging import logger
 from torch.autograd import Variable
+from onmt.constants import ModelTask
 
 
 def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
@@ -64,14 +64,44 @@ def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
         loss_gen = model.generator[0] if use_raw_logits else model.generator
 
     if opt.copy_attn:
-        compute = onmt.modules.CopyGeneratorLossCompute(
-            criterion, loss_gen, tgt_field.vocab, opt.copy_loss_by_seqlength,
-            lambda_coverage=opt.lambda_coverage
-        )
+        if opt.model_task == ModelTask.SEQ2SEQ:
+            compute = onmt.modules.CopyGeneratorLossCompute(
+                criterion, loss_gen, tgt_field.vocab,
+                opt.copy_loss_by_seqlength,
+                lambda_coverage=opt.lambda_coverage
+            )
+        elif opt.model_task == ModelTask.LANGUAGE_MODEL:
+            compute = onmt.modules.CopyGeneratorLMLossCompute(
+                criterion, loss_gen, tgt_field.vocab,
+                opt.copy_loss_by_seqlength,
+                lambda_coverage=opt.lambda_coverage
+            )
+        else:
+            raise ValueError(
+                f"No copy generator loss defined for task {opt.model_task}"
+            )
     else:
-        compute = NMTLossCompute(
-            criterion, loss_gen, lambda_coverage=opt.lambda_coverage,
-            lambda_align=opt.lambda_align, path_loss=path_loss)
+        if opt.model_task == ModelTask.SEQ2SEQ:
+            compute = NMTLossCompute(
+                criterion,
+                loss_gen,
+                lambda_coverage=opt.lambda_coverage,
+                lambda_align=opt.lambda_align, path_loss=path_loss
+            )
+        elif opt.model_task == ModelTask.LANGUAGE_MODEL:
+            assert (
+                opt.lambda_align == 0.0
+            ), "lamdba_align not supported in LM loss"
+            compute = LMLossCompute(
+                criterion,
+                loss_gen,
+                lambda_coverage=opt.lambda_coverage,
+                lambda_align=opt.lambda_align, path_loss=path_loss
+            )
+        else:
+            raise ValueError(
+                f"No compute loss defined for task {opt.model_task}"
+            )
     compute.to(device)
 
     return compute
@@ -222,7 +252,6 @@ class LabelSmoothingLoss(nn.Module):
     KL-divergence between q_{smoothed ground truth prob.}(w)
     and p_{prob. computed by model}(w) is minimized.
     """
-
     def __init__(self, label_smoothing, tgt_vocab_size, ignore_index=-100):
         assert 0.0 < label_smoothing <= 1.0
         self.ignore_index = ignore_index
@@ -237,7 +266,7 @@ class LabelSmoothingLoss(nn.Module):
 
     def forward(self, output, target):
         """
-        output (FloatTensor): batch_size x n_classes (vocab_size)
+        output (FloatTensor): batch_size x n_classes
         target (LongTensor): batch_size
         """
         model_prob = self.one_hot.repeat(target.size(0), 1)

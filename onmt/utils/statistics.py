@@ -110,7 +110,7 @@ class Statistics(object):
 
         Args:
            step (int): current step
-           num_steps (int): total batches
+           n_batch (int): total batches
            start (int): start time of step.
         """
         t = self.elapsed_time()
@@ -130,7 +130,7 @@ class Statistics(object):
                time.time() - start))
         sys.stdout.flush()
 
-    def log_tensorboard(self, prefix, writer, learning_rate, step):
+    def log_tensorboard(self, prefix, writer, learning_rate, patience, step):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
         writer.add_scalar(prefix + "/xent", self.xent(), step)
@@ -138,6 +138,8 @@ class Statistics(object):
         writer.add_scalar(prefix + "/accuracy", self.accuracy(), step)
         writer.add_scalar(prefix + "/tgtper", self.n_words / t, step)
         writer.add_scalar(prefix + "/lr", learning_rate, step)
+        if patience is not None:
+            writer.add_scalar(prefix + "/patience", patience, step)
 
 
 class ScoreMetrics(object):

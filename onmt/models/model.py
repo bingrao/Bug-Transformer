@@ -75,7 +75,7 @@ class NMTModel(BaseModel):
 
         enc_state, memory_bank, lengths = self.encoder(src, lengths, position=src_pos, src_path_vec=src_path_vec)
 
-        if bptt is False:
+        if not bptt:
             self.decoder.init_state(src, memory_bank, enc_state)
             if src_path_vec is not None and hasattr(self, "path_decoder"):
                 self.path_decoder.init_state(src_path, src_path_vec, src_path_state)

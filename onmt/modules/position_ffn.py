@@ -7,10 +7,14 @@ import torch.nn.functional as F
 class ActivationFunction(object):
     relu = "relu"
     gelu = "gelu"
+
+
 ACTIVATION_FUNCTIONS = {
     ActivationFunction.relu: F.relu,
     ActivationFunction.gelu: F.gelu,
 }
+
+
 class PositionwiseFeedForward(nn.Module):
     """ A two-layer Feed-Forward-Network with residual layer norm.
 
