@@ -225,6 +225,13 @@ def model_opts(parser):
               action="store_true",
               help='Whether alignment is conditioned on full target context.')
 
+    group.add('--pos_ffn_activation_fn', '-pos_ffn_activation_fn',
+              type=str, default=ActivationFunction.relu,
+              choices=ACTIVATION_FUNCTIONS.keys(), help='The activation'
+                                                        ' function to use in PositionwiseFeedForward layer. Choices are'
+                                                        f' {ACTIVATION_FUNCTIONS.keys()}. Default to'
+                                                        f' {ActivationFunction.relu}.')
+
     # Generator and loss options.
     group = parser.add_argument_group('Generator')
     group.add('--copy_attn', '-copy_attn', action="store_true",

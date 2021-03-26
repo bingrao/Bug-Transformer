@@ -66,9 +66,9 @@ train:
   path_encoding: 'false'
   share_embeddings: 'true'
   share_decoder_embeddings: 'true'
-  lambda_coverage: 0.5
-  lambda_align: 0.5
-  coverage_attn: 'true'
+#  lambda_coverage: 0.5
+#  lambda_align: 0.5
+#  coverage_attn: 'true'
 
   master_port: 8003
   world_size: 4

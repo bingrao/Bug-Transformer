@@ -437,22 +437,36 @@ class TransformerDecoder(TransformerDecoderBase):
         """Decode, possibly stepwise."""
         if memory_bank is None:
             memory_bank = self.embeddings(tgt)
+
+        position = kwargs.get('position', None)
+
         if step == 0:
             self._init_cache(memory_bank)
 
         tgt_words = tgt[:, :, 0].transpose(0, 1)
 
-        emb = self.embeddings(tgt, step=step)
+        # Add by Bing: Scheduler samples
+        if 'tf_emb' in kwargs.keys() and kwargs['tf_emb'] is not None:
+            emb = kwargs['tf_emb']
+        else:
+            # [tgt_len - 1, batch_size, dim]
+            emb = self.embeddings(tgt, step=step, position=position)
+
         assert emb.dim() == 3  # len x batch x embedding_dim
-
+        # [batch_size, tgt_len - 1, dim]
         output = emb.transpose(0, 1).contiguous()
-        src_memory_bank = memory_bank.transpose(0, 1).contiguous()
 
+        tgt_path_vec = kwargs.get('tgt_path_vec', None)
+        if tgt_path_vec is not None:
+            output = output + tgt_path_vec.transpose(0, 1)
+
+        # [batch_size, src_len, dim]
+        src_memory_bank = memory_bank.transpose(0, 1).contiguous()
         pad_idx = self.embeddings.word_padding_idx
         src_lens = kwargs["memory_lengths"]
         src_max_len = self.state["src"].shape[0]
-        src_pad_mask = ~sequence_mask(src_lens, src_max_len).unsqueeze(1)
-        tgt_pad_mask = tgt_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_tgt]
+        src_pad_mask = ~sequence_mask(src_lens, src_max_len).unsqueeze(1)   # [B, 1, S_tgt], torch.Size([83, 1, 47])
+        tgt_pad_mask = tgt_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_tgt], torch.Size([83, 1, 42])
 
         with_align = kwargs.pop("with_align", False)
         attn_aligns = []
@@ -463,6 +477,9 @@ class TransformerDecoder(TransformerDecoderBase):
                 if step is not None
                 else None
             )
+            # output.shape [batch_size, tgt_len - 1, dim] torch.Size([61, 67, 512])
+            # src_memory_bank.shape [batch_size, src_len, dim] torch.Size([61, 48, 512]),
+            # attn.shape [batch_size, tgt_len - 1, src_len] e.g. torch.Size([61, 67, 48])
             output, attn, attn_align = layer(
                 output,
                 src_memory_bank,

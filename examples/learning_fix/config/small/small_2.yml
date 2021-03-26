@@ -66,6 +66,7 @@ train:
   path_encoding: 'true'
   share_embeddings: 'true'
   share_decoder_embeddings: 'true'
+#  lambda_align: 0.3
 
   master_port: 8002
   world_size: 4

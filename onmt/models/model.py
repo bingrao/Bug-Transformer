@@ -55,12 +55,13 @@ class NMTModel(BaseModel):
     """
 
     def __init__(self, encoder, decoder):
-        super(NMTModel, self).__init__()
+        super(NMTModel, self).__init__(encoder, decoder)
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False,
-                src_pos=None, tgt_pos=None, **kwargs):
+    def forward(self, src, tgt, lengths, bptt=False, with_align=False, **kwargs):
+        src_pos = kwargs.get("src_pos", None)
+        tgt_pos = kwargs.get("tgt_pos", None)
 
         dec_in = tgt[:-1]  # exclude last target from inputs
         tgt_pos = tgt_pos[:-1] if tgt_pos is not None else tgt_pos
@@ -76,7 +77,7 @@ class NMTModel(BaseModel):
 
         if bptt is False:
             self.decoder.init_state(src, memory_bank, enc_state)
-            if src_path_vec is not None:
+            if src_path_vec is not None and hasattr(self, "path_decoder"):
                 self.path_decoder.init_state(src_path, src_path_vec, src_path_state)
 
         tgt_path = kwargs.get('tgt_path', None)
