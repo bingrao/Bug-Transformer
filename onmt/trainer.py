@@ -606,7 +606,7 @@ class Trainer(object):
         """
         if self.report_manager is not None:
             return self.report_manager.report_training(
-                step, num_steps, learning_rate, report_stats,
+                step, num_steps, learning_rate, 0, report_stats,
                 multigpu=self.n_gpu > 1)
 
     def _report_step(self, learning_rate, step, train_stats=None,
@@ -617,7 +617,7 @@ class Trainer(object):
         """
         if self.report_manager is not None:
             return self.report_manager.report_step(
-                learning_rate, step, train_stats=train_stats,
+                learning_rate, 0, step, train_stats=train_stats,
                 valid_stats=valid_stats)
 
     def maybe_noise_source(self, batch):
