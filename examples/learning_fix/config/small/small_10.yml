@@ -18,7 +18,7 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  train_from: examples/learning_fix/data/small/10/small-step-79000-acc-95.28-ppl-1.18-xent-0.17.pt
+#  train_from: examples/learning_fix/data/small/10/small-step-79000-acc-95.28-ppl-1.18-xent-0.17.pt
   save_checkpoint_steps: 1000
   keep_checkpoint: 30
   seed: 3435
@@ -58,12 +58,9 @@ train:
   position_encoding: 'true'
 
   master_port: 8001
-  world_size: 4
+  world_size: 1
   gpu_ranks:
     - 0
-    - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate

@@ -126,7 +126,10 @@ function _abstract() {
 #  OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
 #  OutputFixedDir=$(cat "${ConfigFile}" | grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
 
+  InputBuggyDir=$(cat "${ConfigFile}" | grep -e "buggy_path" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
   OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "output_dir" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
+
+  InputFixedDir=$(cat "${ConfigFile}" | grep -e "fixed_path" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
   OutputFixedDir=$(cat "${ConfigFile}" | grep -e "output_dir" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
 
   OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
@@ -155,35 +158,60 @@ function _abstract() {
   logInfo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}" | tee -a "${LogFile}"
 
+  split -l "${train_cnt}" "${InputBuggyFile}" train-buggy-src
   split -l "${train_cnt}" "${OutputBuggyFile}" train-buggy
   split -l "${train_cnt}" "${OutputBuggyPathFile}" train-buggy-path
-  split -l "${train_cnt}" "${OutputFixedFile}" train-fixed
-  split -l "${train_cnt}" "${OutputFixedPathFile}" train-fixed-path
+  mv ./train-buggy-srcaa "${OutputBuggyDir}"/train-buggy-src.txt
   mv ./train-buggyaa "${OutputBuggyDir}"/train-buggy.txt
   mv ./train-buggy-pathaa "${OutputBuggyDir}"/train-buggy-path.txt
+
+
+  split -l "${train_cnt}" "${InputFixedFile}" train-fixed-src
+  split -l "${train_cnt}" "${OutputFixedFile}" train-fixed
+  split -l "${train_cnt}" "${OutputFixedPathFile}" train-fixed-path
+  mv ./train-fixed-srcaa "${OutputFixedDir}"/train-fixed-src.txt
   mv ./train-fixedaa "${OutputFixedDir}"/train-fixed.txt
   mv ./train-fixed-pathaa "${OutputFixedDir}"/train-fixed-path.txt
+
+  logInfo "BLUE value <train-buggy-src.txt, train-fixed-src.txt>, count: ${train_cnt}"
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy-src.txt < "${OutputFixedDir}"/train-fixed-src.txt | tee -a "${LogFile}"
 
   logInfo "BLUE value <train-buggy.txt, train-fixed.txt>, count: ${train_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt | tee -a "${LogFile}"
 
+  split -l "${eval_cnt}" ./train-buggy-srcab eval-buggy-src; rm -fr train-buggy-srcab
   split -l "${eval_cnt}" ./train-buggyab eval-buggy; rm -fr train-buggyab
   split -l "${eval_cnt}" ./train-buggy-pathab eval-buggy-path; rm -fr train-buggy-pathab
+
+  split -l "${eval_cnt}" ./train-fixed-srcab eval-fixed-src; rm -fr train-fixed-srcab
   split -l "${eval_cnt}" ./train-fixedab eval-fixed; rm -fr train-fixedab
   split -l "${eval_cnt}" ./train-fixed-pathab eval-fixed-path; rm -fr train-fixed-pathab
 
+  mv ./eval-buggy-srcaa "${OutputBuggyDir}"/eval-buggy-src.txt
   mv ./eval-buggyaa "${OutputBuggyDir}"/eval-buggy.txt
   mv ./eval-buggy-pathaa "${OutputBuggyDir}"/eval-buggy-path.txt
+
+  mv ./eval-fixed-srcaa "${OutputFixedDir}"/eval-fixed-src.txt
   mv ./eval-fixedaa "${OutputFixedDir}"/eval-fixed.txt
   mv ./eval-fixed-pathaa "${OutputFixedDir}"/eval-fixed-path.txt
+
+  logInfo "BLUE value <eval-buggy-src.txt, eval-fixed-src.txt>, count: ${eval_cnt}"
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy-src.txt < "${OutputFixedDir}"/eval-fixed-src.txt | tee -a "${LogFile}"
 
   logInfo "BLUE value <eval-buggy.txt, eval-fixed.txt>, count: ${eval_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt | tee -a "${LogFile}"
 
+  mv ./eval-buggy-srcab "${OutputBuggyDir}"/test-buggy-src.txt
   mv ./eval-buggyab "${OutputBuggyDir}"/test-buggy.txt
   mv ./eval-buggy-pathab "${OutputBuggyDir}"/test-buggy-path.txt
+
+  mv ./eval-fixed-srcab "${OutputFixedDir}"/test-fixed-src.txt
   mv ./eval-fixedab "${OutputFixedDir}"/test-fixed.txt
   mv ./eval-fixed-pathab "${OutputFixedDir}"/test-fixed-path.txt
+
+  logInfo "BLUE value <test-buggy-src.txt, test-fixed-src.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy-src.txt < "${OutputFixedDir}"/test-fixed-src.txt | tee -a "${LogFile}"
+
   logInfo "BLUE value <test-buggy.txt, test-fixed.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt | tee -a "${LogFile}"
 }
