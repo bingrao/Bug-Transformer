@@ -158,7 +158,7 @@ function _abstract() {
   logInfo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}" | tee -a "${LogFile}"
 
-  split -l "${train_cnt}" "${InputBuggyFile}" train-buggy-src
+  split -l "${train_cnt}" "${InputBuggyDir}" train-buggy-src
   split -l "${train_cnt}" "${OutputBuggyFile}" train-buggy
   split -l "${train_cnt}" "${OutputBuggyPathFile}" train-buggy-path
   mv ./train-buggy-srcaa "${OutputBuggyDir}"/train-buggy-src.txt
@@ -166,7 +166,7 @@ function _abstract() {
   mv ./train-buggy-pathaa "${OutputBuggyDir}"/train-buggy-path.txt
 
 
-  split -l "${train_cnt}" "${InputFixedFile}" train-fixed-src
+  split -l "${train_cnt}" "${InputFixedDir}" train-fixed-src
   split -l "${train_cnt}" "${OutputFixedFile}" train-fixed
   split -l "${train_cnt}" "${OutputFixedPathFile}" train-fixed-path
   mv ./train-fixed-srcaa "${OutputFixedDir}"/train-fixed-src.txt
