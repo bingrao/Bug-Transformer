@@ -1,0 +1,21 @@
+train:
+  app: 'code2nl'
+  work_model: train
+  do_train: true
+  model_type: "roberta"
+  model_name_or_path: /home/bing/project/Bug-Transformer/examples/codebert/data/codebert-base
+  train_filename: /home/bing/project/Bug-Transformer/examples/codebert/data/code2nl/CodeSearchNet/java/train.jsonl
+  dev_filename: /home/bing/project/Bug-Transformer/examples/codebert/data/code2nl/CodeSearchNet/java/valid.jsonl
+  output_dir: /home/bing/project/Bug-Transformer/examples/codebert/data/code2nl/output
+  learning_rate: 5e-5
+  train_batch_size: 64
+  eval_batch_size: 64
+  beam_size: 10
+  max_source_length: 256
+  max_target_length: 128
+  eval_steps: 1000  # 400 for ruby, 600 for javascript, 1000 for others
+  train_steps: 50000  # 20000 for ruby, 30000 for javascript, 50000 for others
+
+translate:
+  app: 'code2nl'
+  work_model: translate

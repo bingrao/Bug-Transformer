@@ -6,7 +6,7 @@ configFile=$3
 
 ############################# Root envs ############################
 RootPath=$(pwd)
-ProjectPath=${RootPath}/examples/learning_fix
+ProjectPath=${RootPath}/examples/codebert
 ConfigPath=${ProjectPath}/config/${dataset}; [ -d "$ConfigPath" ] || mkdir -p "$ConfigPath"
 BinPath=${ProjectPath}/bin; [ -d "$BinPath" ] || mkdir -p "$BinPath"
 LogPath=${ProjectPath}/logs; [ -d "$LogPath" ] || mkdir -p "$LogPath"
@@ -15,12 +15,12 @@ CurrentDate=$(date +%F)
 
 function help() {
      echo "Usage: [export CUDA_VISIBLE_DEVICES=0;] $0 dataset target configFile" >&2
-     echo "       dataset: [small|median|big|small_old]"
-     echo "       target:  [abstract|preprocess|train|translate|all|inference|performance|loop_translate]"
+     echo "       dataset: [small|median|big]"
+     echo "       target:  [train|translate|all|inference|performance|loop_translate]"
      echo "Example: Using third (or first by default) GPU to train small dataset with small_1.yml config file"
-     echo "Example: The default direcotry that system searches config files: ${ProjectPath}/config/[small|median|big|small_old]"
-     echo "       - export CUDA_VISIBLE_DEVICES=2,3; bash run.sh small train small_1.yml"
-     echo "       - bash run.sh small train small_1.yml"
+     echo "Example: The default direcotry that system searches config files: ${ProjectPath}/config/[small|median|big]"
+     echo "       - export CUDA_VISIBLE_DEVICES=2,3; bash run_codebert.sh small train small_1.yml"
+     echo "       - bash run_codebert.sh small train small_1.yml"
 }
 
 if [ "$#" -ne 3 ] ; then
@@ -47,11 +47,6 @@ DataOutputPath=${DataPath}/${dataset}/${config_index}; [ -d "$DataOutputPath" ] 
 function logInfo() {
     echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
 }
-
-if [ "$target" != "abstract" ]; then
-  logInfo "Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
-  $(echo "$configFile" | grep -Eq  '*_[0-9]+\.yml'$) || exit 1
-fi
 
 logInfo "Check Config file \"${configFile}\" -------- Pass"
 
@@ -107,136 +102,10 @@ function parse_one_layer_yaml() {
    echo "${reg}"
 }
 
-function _abstract() {
-  logInfo "------------------- Code Abstract ------------------------"
-
-  export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M -Dlog4j.configuration=file:///${ConfigPath}/log4j.properties"
-  scala "${BinPath}"/code2abs-1.0-jar-with-dependencies.jar -config "${ConfigFile}" | tee -a "${LogFile}"
-#  scala "${BinPath}"/code2abs-1.0-jar-with-dependencies.jar -run_type "abstract" \
-#        -buggy_path "examples/learning_fix/data/${dataset}/raw/buggy/" \
-#        -fixed_path "examples/learning_fix/data/${dataset}/raw/fixed/" \
-#        -output_dir "examples/learning_fix/data/${dataset}/" \
-#        -idioms_path "examples/learning_fix/data/idioms/idioms.csv" \
-#        -nums_worker 10 \
-#        -with_position false \
-#        -output_position false | tee -a "${LogFile}"
-
-
-  logInfo "Generated abstract code is done, then split into train, test, eval dataset ..."
-#  OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "OutputBuggyDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
-#  OutputFixedDir=$(cat "${ConfigFile}" | grep -e "OutputFixedDir" | awk '{print $3}' | tr -d '"' | tr -d '\r')
-
-  InputBuggyDir=$(cat "${ConfigFile}" | grep -e "buggy_path" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
-  OutputBuggyDir=$(cat "${ConfigFile}" | grep -e "output_dir" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
-
-  InputFixedDir=$(cat "${ConfigFile}" | grep -e "fixed_path" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
-  OutputFixedDir=$(cat "${ConfigFile}" | grep -e "output_dir" | tr -d ":" | awk '{print $NF}' | tr -d '"' | tr -d "\r")
-
-  OutputBuggyFile=${OutputBuggyDir}/total/buggy.txt
-  OutputBuggyPathFile=${OutputBuggyDir}/total/buggy_path.txt
-  OutputFixedFile=${OutputFixedDir}/total/fixed.txt
-  OutputFixedPathFile=${OutputFixedDir}/total/fixed_path.txt
-
-  logInfo "Check ${OutputBuggyFile} if exist"
-  [ -f "${OutputBuggyFile}" ] || exit 1
-
-  logInfo "Check ${OutputFixedFile} if exist"
-  [ -f "${OutputFixedFile}" ] || exit 1
-
-  buggy_cnt=$(awk 'END{print NR}' < "${OutputBuggyFile}")
-  fixed_cnt=$(awk 'END{print NR}' < "${OutputFixedFile}")
-
-  if [ "$buggy_cnt" != "$fixed_cnt" ]
-  then
-     logInfo "The total number does not match ${buggy_cnt} != ${fixed_cnt}"
-     exit 1
-  fi
-
-  train_cnt="$(echo "scale=0; $buggy_cnt *  0.8 / 1" | bc)"
-  eval_cnt="$(echo "scale=0; $buggy_cnt *  0.1 / 1" | bc)"
-
-  logInfo "BLUE value <buggy_src.txt, fixed_src.txt>, count: ${buggy_cnt}"
-  "${BinPath}"/multi-bleu.perl "${InputBuggyDir}" < "${OutputFixedFile}" | tee -a "${LogFile}"
-
-  logInfo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}" | tee -a "${LogFile}"
-
-  split -l "${train_cnt}" "${InputBuggyDir}" train-buggy-src
-  split -l "${train_cnt}" "${OutputBuggyFile}" train-buggy
-  split -l "${train_cnt}" "${OutputBuggyPathFile}" train-buggy-path
-  mv ./train-buggy-srcaa "${OutputBuggyDir}"/train-buggy-src.txt
-  mv ./train-buggyaa "${OutputBuggyDir}"/train-buggy.txt
-  mv ./train-buggy-pathaa "${OutputBuggyDir}"/train-buggy-path.txt
-
-
-  split -l "${train_cnt}" "${InputFixedDir}" train-fixed-src
-  split -l "${train_cnt}" "${OutputFixedFile}" train-fixed
-  split -l "${train_cnt}" "${OutputFixedPathFile}" train-fixed-path
-  mv ./train-fixed-srcaa "${OutputFixedDir}"/train-fixed-src.txt
-  mv ./train-fixedaa "${OutputFixedDir}"/train-fixed.txt
-  mv ./train-fixed-pathaa "${OutputFixedDir}"/train-fixed-path.txt
-
-  logInfo "BLUE value <train-buggy-src.txt, train-fixed-src.txt>, count: ${train_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy-src.txt < "${InputFixedDir}"/train-fixed-src.txt | tee -a "${LogFile}"
-
-  logInfo "BLUE value <train-buggy.txt, train-fixed.txt>, count: ${train_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt | tee -a "${LogFile}"
-
-  split -l "${eval_cnt}" ./train-buggy-srcab eval-buggy-src; rm -fr train-buggy-srcab
-  split -l "${eval_cnt}" ./train-buggyab eval-buggy; rm -fr train-buggyab
-  split -l "${eval_cnt}" ./train-buggy-pathab eval-buggy-path; rm -fr train-buggy-pathab
-
-  split -l "${eval_cnt}" ./train-fixed-srcab eval-fixed-src; rm -fr train-fixed-srcab
-  split -l "${eval_cnt}" ./train-fixedab eval-fixed; rm -fr train-fixedab
-  split -l "${eval_cnt}" ./train-fixed-pathab eval-fixed-path; rm -fr train-fixed-pathab
-
-  mv ./eval-buggy-srcaa "${OutputBuggyDir}"/eval-buggy-src.txt
-  mv ./eval-buggyaa "${OutputBuggyDir}"/eval-buggy.txt
-  mv ./eval-buggy-pathaa "${OutputBuggyDir}"/eval-buggy-path.txt
-
-  mv ./eval-fixed-srcaa "${OutputFixedDir}"/eval-fixed-src.txt
-  mv ./eval-fixedaa "${OutputFixedDir}"/eval-fixed.txt
-  mv ./eval-fixed-pathaa "${OutputFixedDir}"/eval-fixed-path.txt
-
-  logInfo "BLUE value <eval-buggy-src.txt, eval-fixed-src.txt>, count: ${eval_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy-src.txt < "${OutputFixedDir}"/eval-fixed-src.txt | tee -a "${LogFile}"
-
-  logInfo "BLUE value <eval-buggy.txt, eval-fixed.txt>, count: ${eval_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt | tee -a "${LogFile}"
-
-  mv ./eval-buggy-srcab "${OutputBuggyDir}"/test-buggy-src.txt
-  mv ./eval-buggyab "${OutputBuggyDir}"/test-buggy.txt
-  mv ./eval-buggy-pathab "${OutputBuggyDir}"/test-buggy-path.txt
-
-  mv ./eval-fixed-srcab "${OutputFixedDir}"/test-fixed-src.txt
-  mv ./eval-fixedab "${OutputFixedDir}"/test-fixed.txt
-  mv ./eval-fixed-pathab "${OutputFixedDir}"/test-fixed-path.txt
-
-  logInfo "BLUE value <test-buggy-src.txt, test-fixed-src.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy-src.txt < "${OutputFixedDir}"/test-fixed-src.txt | tee -a "${LogFile}"
-
-  logInfo "BLUE value <test-buggy.txt, test-fixed.txt, count: $((buggy_cnt - train_cnt - eval_cnt))>"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/test-buggy.txt < "${OutputFixedDir}"/test-fixed.txt | tee -a "${LogFile}"
-}
-
-
-function _preprocess() {
-  logInfo "------------------- Preprocess  ------------------------"
-  onmt_preprocess -config "${ConfigFile}" -log_file "${LogFile}"
-}
-
 
 function _train() {
   logInfo "------------------- Training ------------------------"
-  ModelCheckpointPrefix="$(parse_yaml "${ConfigFile}" "train" "save_model")"
-  [ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset} || ModelCheckpointPrefix=${RootPath}/${ModelCheckpointPrefix}
-
-  # The numbers of GPU nodes used for training task
-  Nums_GPU=$(parse_yaml "${ConfigFile}" "train" "world_size")
-  logInfo "Using ${Nums_GPU} for training task ... "
-  [[ -z "${CUDA_VISIBLE_DEVICES}" ]] && export CUDA_VISIBLE_DEVICES=$(seq -s, 0 "${Nums_GPU}") || logInfo "exist: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
-  logInfo "The checkpoint will be saved with prefix ${ModelCheckpointPrefix}"
-  onmt_train -save_model "${ModelCheckpointPrefix}" -config "${ConfigFile}" -log_file "${LogFile}"
+  python ${BinPath}/train.py -config "${ConfigFile}" -log_file "${LogFile}" --output_dir "${DataOutputPath}"
 }
 
 function _translate() {
@@ -572,14 +441,6 @@ function _performance() {
 ##################################################################################################
 
 case ${target} in
-   "abstract")
-      _abstract
-   ;;
-
-   "preprocess")
-      _preprocess
-   ;;
-
    "train")
       _train
    ;;

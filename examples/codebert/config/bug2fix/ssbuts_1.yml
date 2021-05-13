@@ -1,0 +1,28 @@
+train:
+  app: 'bug2fix'
+  work_model: train
+  do_train: true
+  do_eval: true
+  model_type: "roberta"
+  model_name_or_path: /home/bing/project/Bug-Transformer/examples/codebert/data/codebert-base
+  train_filename:
+    - /home/bing/project/Bug-Transformer/examples/codebert/data/bug2fix/unique/split/large/src-train.txt
+    - /home/bing/project/Bug-Transformer/examples/codebert/data/bug2fix/unique/split/large/tgt-train.txt
+
+  dev_filename:
+    - /home/bing/project/Bug-Transformer/examples/codebert/data/bug2fix/unique/split/large/src-val.txt
+    - /home/bing/project/Bug-Transformer/examples/codebert/data/bug2fix/unique/split/large/tgt-val.txt
+
+  output_dir: /home/bing/project/Bug-Transformer/examples/codebert/data/bug2fix/output
+  learning_rate: 5e-5
+  train_batch_size: 4
+  eval_batch_size: 4
+  beam_size: 5
+  max_source_length: 510
+  max_target_length: 510
+  eval_steps: 10  # 400 for ruby, 600 for javascript, 1000 for others
+  train_steps: 50000  # 20000 for ruby, 30000 for javascript, 50000 for others
+
+translate:
+  app: 'bug2fix'
+  work_model: translate
