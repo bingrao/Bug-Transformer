@@ -36,7 +36,8 @@ setup(
         "pillow",
         "py4j",
         "networkx",
-        "transformers==2.5.0"
+        "transformers==2.5.0",
+        "matplotlib"
     ],
     entry_points={
         "console_scripts": [
