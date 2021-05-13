@@ -243,7 +243,7 @@ def get_arguments(parser):
               choices=['bug2fix', 'code2nl'],
               help="Indicator that what kinds of application is working on right now")
 
-    group.add('--device_id', '-device_id', type=int, default=0, nargs='*',
+    group.add('--device_id', '-device_id', type=int, default=[0], nargs='*',
               help="Specify the GPU visible Device ID for training/testing task")
 
     group.add('--device', '-device', type=str, choices=['cuda', 'cpu'],
@@ -346,7 +346,7 @@ def main(parser=None):
 
     if args.device_id is not None:
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.device_id)
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in args.device_id])
         args.is_cuda = True if torch.cuda.is_available() else False
     else:
         args.is_cuda = False

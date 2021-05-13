@@ -35,7 +35,8 @@ setup(
         "sacrebleu",
         "pillow",
         "py4j",
-        "networkx"
+        "networkx",
+        "transformers==2.5.0"
     ],
     entry_points={
         "console_scripts": [
