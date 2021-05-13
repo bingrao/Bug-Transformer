@@ -363,7 +363,7 @@ def main(parser=None):
     args.logger.warning("Process rank: %s, device: %s, n_gpu: %s, distributed training: %s",
                         args.local_rank, device, args.n_gpu, bool(args.local_rank != -1))
     args.device = device
-
+    args.n_gpu = 1
     # Set seed
     set_seed(args)
     # make dir if output_dir not exist
