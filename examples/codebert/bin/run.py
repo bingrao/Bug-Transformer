@@ -344,12 +344,12 @@ def main(parser=None):
     args = get_arguments(parser)
     args.logger = init_logger(args.log_file)
 
-    # if args.device_id is not None:
-    #     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    #     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in args.device_id])
-    #     args.is_cuda = True if torch.cuda.is_available() else False
-    # else:
-    #     args.is_cuda = False
+    if args.device_id is not None:
+        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in args.device_id])
+        args.is_cuda = True if torch.cuda.is_available() else False
+    else:
+        args.is_cuda = False
 
     # Setup CUDA, GPU & distributed training
     if args.local_rank == -1 or args.no_cuda:
@@ -363,6 +363,7 @@ def main(parser=None):
     args.logger.warning("Process rank: %s, device: %s, n_gpu: %s, distributed training: %s",
                         args.local_rank, device, args.n_gpu, bool(args.local_rank != -1))
     args.device = device
+    # Disable mult-gpu
     args.n_gpu = 1
     # Set seed
     set_seed(args)
