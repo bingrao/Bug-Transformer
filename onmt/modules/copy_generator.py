@@ -244,7 +244,7 @@ class CommonCopyGeneratorLossCompute(CommonLossCompute):
         else:
             loss = loss.sum()
 
-        return loss, stats
+        return loss, stats, None
 
     def _make_shard_state(self, batch, output, range_, attns):
         """See base class for args description."""
