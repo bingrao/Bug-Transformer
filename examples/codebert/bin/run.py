@@ -364,10 +364,7 @@ def main(parser=None):
                         args.local_rank, device, args.n_gpu, bool(args.local_rank != -1))
     args.device = device
 
-    # # Disable mult-gpu
-    # args.n_gpu = 1
     # Set seed
-
     set_seed(args)
     # make dir if output_dir not exist
     if os.path.exists(args.output_dir) is False:
