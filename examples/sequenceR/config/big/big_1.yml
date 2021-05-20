@@ -1,0 +1,66 @@
+preprocess:
+  work_model: preprocess
+
+  train_src: examples/sequenceR/data/big/train-buggy-src.txt
+  train_tgt: examples/sequenceR/data/big/train-fixed-src.txt
+
+  valid_src: examples/sequenceR/data/big/eval-buggy-src.txt
+  valid_tgt: examples/sequenceR/data/big/eval-fixed-src.txt
+
+  save_data: examples/sequenceR/data/big/big
+  src_seq_length: 1010
+  tgt_seq_length: 200
+  src_seq_length_trunc: 400
+  tgt_seq_length_trunc: 200
+  src_vocab_size: 1000
+  tgt_vocab_size: 1000
+  dynamic_dict: True
+  num_threads: 10
+  overwrite: True
+  share_vocab: True
+  pos_vec_size: 256
+  data_type: "code"
+
+train:
+  work_model: train
+  data: examples/sequenceR/data/big/big
+  save_checkpoint_steps: 2000
+  keep_checkpoint: 1000
+  seed: 3435
+  train_steps: 50000
+  valid_steps: 5000
+  early_stopping: 10
+  warmup_steps: 4000
+  report_every: 1000
+  batch_size: 256
+
+  encoder_type: brnn
+  enc_layers: 2
+  decoder_type: rnn
+  dec_layers: 2
+  rnn_size: 256
+  global_attention: general
+
+  word_vec_size: 256
+  bridge: True
+  copy_attn: True
+  reuse_copy_attn: True
+
+  master_port: 8001
+  world_size: 2
+  gpu_ranks:
+    - 0
+    - 1
+
+translate:
+  work_model: translate
+  model: examples/sequenceR/data/big/1/big-step-36000-acc-97.56-ppl-1.10-xent-0.09.pt
+  src: examples/sequenceR/data/big/test-buggy-src.txt
+  tgt: examples/sequenceR/data/big/test-fixed-src.txt
+  data_type: "code"
+  share_vocab: True
+  min_length: 0
+  max_length: 100
+  batch_size: 16
+  gpu: 0
+#  report_align: 'true'
