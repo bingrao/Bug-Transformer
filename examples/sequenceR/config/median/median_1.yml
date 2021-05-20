@@ -54,12 +54,13 @@ train:
 
 translate:
   work_model: translate
+  model: examples/sequenceR/data/median/1/median-step-6000-acc-90.99-ppl-1.46-xent-0.38.pt
   src: examples/sequenceR/data/median/test-buggy-src.txt
   tgt: examples/sequenceR/data/median/test-fixed-src.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
-  max_length: 100
+  max_length: 150
   batch_size: 16
   gpu: 0
 #  report_align: 'true'
