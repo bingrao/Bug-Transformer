@@ -121,36 +121,23 @@ function _translate() {
   SECONDS=0
 
   # The buggy code (source) to translate task
-  TranslateSource=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "src")
-
+  TranslateSource=$(parse_yaml "${ConfigFile}" "translate" "src")
   # The fixed code (target) to translate task
-  TranslateTarget=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "tgt")
+  TranslateTarget=$(parse_yaml "${ConfigFile}" "translate" "tgt")
 
   # The model predict output, each line is corresponding to the line in buggy code
   TranslateOutput=$(parse_yaml "${ConfigFile}" "translate" "output")
   [ -z "${TranslateOutput}" ] && TranslateOutput=${DataOutputPath}/predictions.txt || TranslateOutput=${RootPath}/${TranslateOutput}
 
 
-  ModelCheckpointPrefix="$(parse_yaml "${ConfigFile}" "train" "save_model")"
-  [ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset} || ModelCheckpointPrefix=${RootPath}/${ModelCheckpointPrefix}
+#  ModelCheckpointPrefix="$(parse_yaml "${ConfigFile}" "train" "save_model")"
+#  [ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset} || ModelCheckpointPrefix=${RootPath}/${ModelCheckpointPrefix}
 
   logInfo "Beam Size ${beam_size}, nums of best ${n_best}"
 
-  # Test if checkpoint is set up in the config file
-  if [ -z "$(parse_yaml "${ConfigFile}" "translate" "model")" ]
-  then
-      logInfo "The Checkpoint model is not be set up in ${ConfigFile}, then search best one."
+  ModelCheckpoint=$(parse_yaml "${ConfigFile}" "translate" "model")
 
-      # NF means the number of parameters in awk command
-      # shellcheck disable=SC2012
-      ModelCheckpoint=$(ls "${ModelCheckpointPrefix}"-step-*.pt |
-          awk -F '-' 'BEGIN{maxv=-1000000} {score=$(NF-4); if (score > maxv) {maxv=score; max=$0}}  END{ print max}')
-  else
-      ModelCheckpoint=${RootPath}/$(parse_yaml "${ConfigFile}" "translate" "model")
-  fi
-
-
-  step=$(echo "${ModelCheckpoint}" | awk -F'/' '{print $NF}' | cut -d'-' -f 3)
+  step=1000
   DataOutputStepPath=${DataOutputPath}/${step}; [ -d "$DataOutputStepPath" ] || mkdir -p "$DataOutputStepPath"
   PredBackupPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}".txt
   PredBestPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}"_best.txt
@@ -158,7 +145,7 @@ function _translate() {
   if [ "${enableTranslate}" = true ]; then
     logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
     logInfo "The output prediction will be save to ${TranslateOutput}"
-    onmt_translate -config "${ConfigFile}" -log_file "${LogFile}" -beam_size "${beam_size}" -n_best "${n_best}" -model "${ModelCheckpoint}" -output "${TranslateOutput}"
+    python ${BinPath}/translate.py -config "${ConfigFile}" -log_file "${LogFile}" --beam_size "${beam_size}" --output_dir "${TranslateOutput}"
 
     # Backup all predictions txt
     logInfo "Backup the model output to ${PredBackupPath}"

@@ -281,6 +281,12 @@ def get_arguments(parser):
     parser.add_argument("--test_filename", default=[], nargs='*', type=str,
                         help="The test filename. Should contain the .jsonl files for this task.")
 
+    parser.add_argument("--src", default=None, type=str,
+                        help="The test filename. Should contain the .jsonl files for this task.")
+
+    parser.add_argument("--tgt", default=None, type=str,
+                        help="The test filename. Should contain the .jsonl files for this task.")
+
     parser.add_argument("--config_name", default="", type=str,
                         help="Pretrained config name or path if not the same as model_name")
     parser.add_argument("--tokenizer_name", default="", type=str,
@@ -616,6 +622,13 @@ def main(parser=None):
             files.append(args.dev_filename)
         if args.test_filename is not None:
             files.append(args.test_filename)
+
+        if args.src is not None:
+            files.append(args.src)
+
+        if args.tgt is not None:
+            files.append(args.tgt)
+
         for idx, file in enumerate(files):
             args.logger.info("Test file: {}".format(file))
             eval_examples = read_examples(args, file)
