@@ -226,7 +226,7 @@ def set_seed(args):
 
 
 def get_arguments(parser):
-    ## Required parameters
+    # Required parameters
     group = parser.add_argument_group("Configuration")
     group.add('-config', '--config', required=False,
               is_config_file_arg=True,
@@ -273,7 +273,7 @@ def get_arguments(parser):
                         help="The output directory where the model predictions and checkpoints will be written.")
     parser.add_argument("--load_model_path", default=None, type=str,
                         help="Path to trained model: Should contain the .bin files")
-    ## Other parameters
+    # Other parameters
     parser.add_argument("--train_filename", default=[], nargs='*', type=str,
                         help="The train filename. Should contain the .jsonl files for this task.")
     parser.add_argument("--dev_filename", default=[], nargs='*', type=str,
