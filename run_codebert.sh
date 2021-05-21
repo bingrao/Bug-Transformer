@@ -127,7 +127,7 @@ function _translate() {
 
   # The model predict output, each line is corresponding to the line in buggy code
   TranslateOutput=$(parse_yaml "${ConfigFile}" "translate" "output")
-  [ -z "${TranslateOutput}" ] && TranslateOutput=${DataOutputPath}/predictions.txt || TranslateOutput=${RootPath}/${TranslateOutput}
+  [ -z "${TranslateOutput}" ] && TranslateOutput=${DataOutputPath}/pred_{beam_size} || TranslateOutput=${RootPath}/${TranslateOutput}
 
 
 #  ModelCheckpointPrefix="$(parse_yaml "${ConfigFile}" "train" "save_model")"
@@ -135,22 +135,17 @@ function _translate() {
 
   logInfo "Beam Size ${beam_size}, nums of best ${n_best}"
 
-  ModelCheckpoint=$(parse_yaml "${ConfigFile}" "translate" "model")
-
-  step=1000
+  step=0
   DataOutputStepPath=${DataOutputPath}/${step}; [ -d "$DataOutputStepPath" ] || mkdir -p "$DataOutputStepPath"
   PredBackupPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}".txt
   PredBestPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}"_best.txt
+  logInfo "The output prediction will be save to ${TranslateOutput}"
+  python ${BinPath}/translate.py -config "${ConfigFile}" -log_file "${LogFile}" --beam_size "${beam_size}" --output_dir "${TranslateOutput}"
 
-  if [ "${enableTranslate}" = true ]; then
-    logInfo "Loading checkpoint ${ModelCheckpoint} for translate job ..."
-    logInfo "The output prediction will be save to ${TranslateOutput}"
-    python ${BinPath}/translate.py -config "${ConfigFile}" -log_file "${LogFile}" --beam_size "${beam_size}" --output_dir "${TranslateOutput}"
+  # Backup all predictions txt
+  logInfo "Backup the model output to ${PredBackupPath}"
+  mv "${TranslateOutput}" "${PredBackupPath}"
 
-    # Backup all predictions txt
-    logInfo "Backup the model output to ${PredBackupPath}"
-    mv "${TranslateOutput}" "${PredBackupPath}"
-  fi
 
   logInfo "------------------- Classification ------------------------"
   total=$(awk 'END{print NR}' "${TranslateTarget}" | awk '{print $1}')
