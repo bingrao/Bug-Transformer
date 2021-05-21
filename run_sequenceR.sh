@@ -465,8 +465,8 @@ function _inference() {
   TranslateBestRatio=1.0
 
   logInfo "------------------- Inference Search ------------------------"
-#  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
-  beam_widths=("1" "5" "10" "15" "20")
+  beam_widths=("25" "30" "35" "40" "45" "50")
+#  beam_widths=("1" "5" "10" "15" "20")
   for beam_width in ${beam_widths[*]}
   do
     _translate "${beam_width}" "${beam_width}" "${TranslateBestRatio}"
