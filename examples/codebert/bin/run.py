@@ -274,11 +274,11 @@ def get_arguments(parser):
     parser.add_argument("--load_model_path", default=None, type=str,
                         help="Path to trained model: Should contain the .bin files")
     # Other parameters
-    parser.add_argument("--train_filename", default=[], nargs='*', type=str,
+    parser.add_argument("--train_filename", default=None, nargs='*', type=str,
                         help="The train filename. Should contain the .jsonl files for this task.")
-    parser.add_argument("--dev_filename", default=[], nargs='*', type=str,
+    parser.add_argument("--dev_filename", default=None, nargs='*', type=str,
                         help="The dev filename. Should contain the .jsonl files for this task.")
-    parser.add_argument("--test_filename", default=[], nargs='*', type=str,
+    parser.add_argument("--test_filename", default=None, nargs='*', type=str,
                         help="The test filename. Should contain the .jsonl files for this task.")
 
     parser.add_argument("--src", default=None, type=str,
@@ -623,11 +623,9 @@ def main(parser=None):
         if args.test_filename is not None:
             files.append(args.test_filename)
 
-        if args.src is not None:
-            files.append(args.src)
+        if args.src is not None and args.tgt is not None:
+            files.append([args.src, args.tgt])
 
-        if args.tgt is not None:
-            files.append(args.tgt)
 
         for idx, file in enumerate(files):
             args.logger.info("Test file: {}".format(file))
