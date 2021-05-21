@@ -10,8 +10,8 @@ train:
     - /home/bing/project/Bug-Transformer/examples/learning_fix/data/big/train-fixed-src.txt
 
   dev_filename:
-    - /home/bing/project/Bug-Transformer/examples/learning_fix/data/big/valid-buggy-src.txt
-    - /home/bing/project/Bug-Transformer/examples/learning_fix/data/big/valid-fixed-src.txt
+    - /home/bing/project/Bug-Transformer/examples/learning_fix/data/big/eval-buggy-src.txt
+    - /home/bing/project/Bug-Transformer/examples/learning_fix/data/big/eval-fixed-src.txt
 
   learning_rate: 5e-5
   train_batch_size: 4
