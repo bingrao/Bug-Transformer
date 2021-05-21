@@ -120,9 +120,9 @@ class PredictionSplit(object):
 
         self.score = make_ext_evaluators(self.opt.measure)[0]
 
-        self.src_buggy = [line.strip() for line in open(self.opt.src_buggy, 'r')]
-        self.src_fixed = [line.strip() for line in open(self.opt.src_fixed, 'r')]
-        self.pred_fixed = [line.strip() for line in open(self.opt.pred_fixed, 'r')]
+        self.src_buggy = [line.strip().split("\t")[-1] for line in open(self.opt.src_buggy, 'r')]
+        self.src_fixed = [line.strip().split("\t")[-1] for line in open(self.opt.src_fixed, 'r')]
+        self.pred_fixed = [line.strip().split("\t")[-1] for line in open(self.opt.pred_fixed, 'r')]
         self.n_best = self.opt.n_best
         self.nums_buggy = len(self.src_buggy)
         self.nums_thread = self.opt.nums_thread
@@ -321,10 +321,14 @@ if __name__ == "__main__":
     start = timeit.default_timer()
     parser = argparse.ArgumentParser(description='Process some integers.')
 
-    parser.add_argument('-output', '--output', required=True, type=str, default='')
-    parser.add_argument('-src_buggy', '--src_buggy', type=str, required=True)
-    parser.add_argument('-src_fixed', '--src_fixed', type=str, required=True)
-    parser.add_argument('-pred_fixed', '--pred_fixed', type=str, required=True)
+    parser.add_argument('-output', '--output', required=False, type=str,
+                        default='/home/bing/project/Bug-Transformer/examples/codebert/data/small/1/pred_1/test_0_best.output')
+    parser.add_argument('-src_buggy', '--src_buggy', type=str, required=False,
+                        default="/home/bing/project/Bug-Transformer/examples/learning_fix/data/small/test-buggy-src.txt")
+    parser.add_argument('-src_fixed', '--src_fixed', type=str, required=False,
+                        default="/home/bing/project/Bug-Transformer/examples/learning_fix/data/small/test-fixed-src.txt")
+    parser.add_argument('-pred_fixed', '--pred_fixed', type=str, required=False,
+                        default="/home/bing/project/Bug-Transformer/examples/codebert/data/small/1/pred_1/test_0.output")
     parser.add_argument('-n_best', '--n_best', type=int, default=1)
     parser.add_argument('-best_ratio', '--best_ratio', type=float, default=1.0)
     parser.add_argument('-measure', '--measure', type=str, default='bleu', choices=['similarity', 'ast', 'bleu'])

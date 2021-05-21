@@ -126,25 +126,20 @@ function _translate() {
   TranslateTarget=$(parse_yaml "${ConfigFile}" "translate" "tgt")
 
   # The model predict output, each line is corresponding to the line in buggy code
-  TranslateOutput=$(parse_yaml "${ConfigFile}" "translate" "output")
-  [ -z "${TranslateOutput}" ] && TranslateOutput=${DataOutputPath}/pred_{beam_size} || TranslateOutput=${RootPath}/${TranslateOutput}
-
-
-#  ModelCheckpointPrefix="$(parse_yaml "${ConfigFile}" "train" "save_model")"
-#  [ -z "${ModelCheckpointPrefix}" ] && ModelCheckpointPrefix=${DataOutputPath}/${dataset} || ModelCheckpointPrefix=${RootPath}/${ModelCheckpointPrefix}
+  TranslateOutputDir=$(parse_yaml "${ConfigFile}" "translate" "output")
+  [ -z "${TranslateOutputDir}" ] && TranslateOutputDir=${DataOutputPath}/pred_${beam_size} || TranslateOutputDir=${RootPath}/${TranslateOutput}
 
   logInfo "Beam Size ${beam_size}, nums of best ${n_best}"
 
-  step=0
-  DataOutputStepPath=${DataOutputPath}/${step}; [ -d "$DataOutputStepPath" ] || mkdir -p "$DataOutputStepPath"
-  PredBackupPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}".txt
-  PredBestPath="${DataOutputStepPath}"/predictions_"${beam_size}"_"${n_best}"_best.txt
-  logInfo "The output prediction will be save to ${TranslateOutput}"
-  python ${BinPath}/translate.py -config "${ConfigFile}" -log_file "${LogFile}" --beam_size "${beam_size}" --output_dir "${TranslateOutput}"
+  PredBackupPath="${TranslateOutputDir}"/predictions_"${beam_size}"_"${n_best}".txt
+  PredBestPath="${TranslateOutputDir}"/predictions_"${beam_size}"_"${n_best}"_best.txt
+
+  logInfo "The output prediction will be save to ${TranslateOutputDir}"
+  python ${BinPath}/translate.py -config "${ConfigFile}" -log_file "${LogFile}" --beam_size "${beam_size}" --output_dir "${TranslateOutputDir}"
 
   # Backup all predictions txt
   logInfo "Backup the model output to ${PredBackupPath}"
-  mv "${TranslateOutput}" "${PredBackupPath}"
+  cp "${TranslateOutputDir}/test_0.output" "${PredBackupPath}"
 
 
   logInfo "------------------- Classification ------------------------"
@@ -316,8 +311,8 @@ function _inference() {
   TranslateBestRatio=1.0
 
   logInfo "------------------- Inference Search ------------------------"
-#  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
-  beam_widths=("1" "5" "10" "15" "20")
+  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
+#  beam_widths=("1" "5" "10" "15" "20")
   for beam_width in ${beam_widths[*]}
   do
     _translate "${beam_width}" "${beam_width}" "${TranslateBestRatio}"
