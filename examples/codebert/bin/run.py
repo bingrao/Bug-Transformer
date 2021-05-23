@@ -664,11 +664,11 @@ def main(parser=None):
                     f1.write(str(gold.idx) + '\t' + gold.target + '\n')
                     accs.append(ref == gold.target)
 
-            (goldMap, predictionMap) = computeMaps(predictions,
-                                                   os.path.join(args.output_dir, "test_{}.gold".format(idx)))
-            dev_bleu = round(bleuFromMaps(goldMap, predictionMap)[0], 2)
-            args.logger.info("  %s = %s " % ("bleu-4", str(dev_bleu)))
-            args.logger.info("  " + "*" * 20)
+            # (goldMap, predictionMap) = computeMaps(predictions,
+            #                                        os.path.join(args.output_dir, "test_{}.gold".format(idx)))
+            # dev_bleu = round(bleuFromMaps(goldMap, predictionMap)[0], 2)
+            # args.logger.info("  %s = %s " % ("bleu-4", str(dev_bleu)))
+            # args.logger.info("  " + "*" * 20)
 
 
 if __name__ == "__main__":
