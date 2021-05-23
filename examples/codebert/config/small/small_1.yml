@@ -32,6 +32,7 @@ translate:
   do_train: false
   do_eval: false
   do_test: true
+  eval_batch_size: 4
   src: /home/bing/project/Bug-Transformer/examples/learning_fix/data/small/test-buggy-src.txt
   tgt: /home/bing/project/Bug-Transformer/examples/learning_fix/data/small/test-fixed-src.txt
 
