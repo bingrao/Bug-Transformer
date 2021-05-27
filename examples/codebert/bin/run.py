@@ -642,27 +642,31 @@ def main(parser=None):
             model.eval()
             p = []
             for batch in tqdm(eval_dataloader, total=len(eval_dataloader)):
-                batch = tuple(t.to(device) for t in batch)
+                batch = tuple(t.to(device) for t in batch)      # torch.Size([4, 64])
                 source_ids, source_mask = batch
                 with torch.no_grad():
-                    preds = model(source_ids=source_ids, source_mask=source_mask)
-                    for pred in preds:
-                        t = pred[0].cpu().numpy()
-                        t = list(t)
-                        if 0 in t:
-                            t = t[:t.index(0)]
-                        text = tokenizer.decode(t, clean_up_tokenization_spaces=False)
-                        p.append(text)
+                    preds = model(source_ids=source_ids, source_mask=source_mask)   # torch.Size([4, 10, 70])
+                    for pred in preds:  # torch.Size([10, 32])
+                        for t in pred:
+                            # t = pred[0].cpu().numpy()
+                            t = list(t.cpu().numpy())
+                            if 0 in t:
+                                t = t[:t.index(0)]
+                            text = tokenizer.decode(t, clean_up_tokenization_spaces=False)
+                            p.append(text)
             model.train()
             predictions = []
             accs = []
-            with open(os.path.join(args.output_dir, "test_{}.output".format(str(idx))), 'w') as f, open(
-                    os.path.join(args.output_dir, "test_{}.gold".format(str(idx))), 'w') as f1:
-                for ref, gold in zip(p, eval_examples):
-                    predictions.append(str(gold.idx) + '\t' + ref)
-                    f.write(str(gold.idx) + '\t' + ref + '\n')
-                    f1.write(str(gold.idx) + '\t' + gold.target + '\n')
-                    accs.append(ref == gold.target)
+
+            with open(os.path.join(args.output_dir, "test_{}.output".format(str(idx))), 'w') as f:
+                f.writelines("\n".join(p))
+                f.write('\n')
+
+                # for ref, gold in zip(p, eval_examples):
+                #     predictions.append(str(gold.idx) + '\t' + ref)
+                #     f.write(str(gold.idx) + '\t' + ref + '\n')
+                #     f1.write(str(gold.idx) + '\t' + gold.target + '\n')
+                #     accs.append(ref == gold.target)
 
             # (goldMap, predictionMap) = computeMaps(predictions,
             #                                        os.path.join(args.output_dir, "test_{}.gold".format(idx)))

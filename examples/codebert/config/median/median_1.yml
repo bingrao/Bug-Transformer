@@ -5,6 +5,7 @@ train:
   do_eval: true
   model_type: "roberta"
   model_name_or_path: /home/bing/project/Bug-Transformer/examples/codebert/data/codebert-base
+  load_model_path: /home/bing/project/Bug-Transformer/examples/codebert/data/median/1/checkpoint-best-bleu/pytorch_model.bin
   train_filename:
     - /home/bing/project/Bug-Transformer/examples/learning_fix/data/median/train-buggy-src.txt
     - /home/bing/project/Bug-Transformer/examples/learning_fix/data/median/train-fixed-src.txt
@@ -23,6 +24,9 @@ train:
   train_steps: 50000  # 20000 for ruby, 30000 for javascript, 50000 for others
   device_id:
     - 0
+    - 1
+    - 2
+    - 3
 
 translate:
   app: 'bug2fix'
@@ -31,9 +35,11 @@ translate:
   do_train: false
   do_eval: false
   do_test: true
-  eval_batch_size: 4
+  eval_batch_size: 128
   src: /home/bing/project/Bug-Transformer/examples/learning_fix/data/median/test-buggy-src.txt
   tgt: /home/bing/project/Bug-Transformer/examples/learning_fix/data/median/test-fixed-src.txt
 
   model_name_or_path: /home/bing/project/Bug-Transformer/examples/codebert/data/codebert-base
   load_model_path: /home/bing/project/Bug-Transformer/examples/codebert/data/median/1/checkpoint-best-bleu/pytorch_model.bin
+
+  max_target_length: 300

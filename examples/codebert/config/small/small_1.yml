@@ -32,10 +32,12 @@ translate:
   do_train: false
   do_eval: false
   do_test: true
-  eval_batch_size: 4
+  eval_batch_size: 16
   src: /home/bing/project/Bug-Transformer/examples/learning_fix/data/small/test-buggy-src.txt
   tgt: /home/bing/project/Bug-Transformer/examples/learning_fix/data/small/test-fixed-src.txt
 
   model_name_or_path: /home/bing/project/Bug-Transformer/examples/codebert/data/codebert-base
   load_model_path: /home/bing/project/Bug-Transformer/examples/codebert/data/small/1/checkpoint-best-bleu/pytorch_model.bin
   output_dir: /home/bing/project/Bug-Transformer/examples/codebert/data/small/1/predictions
+
+  max_target_length: 70
