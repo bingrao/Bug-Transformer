@@ -54,13 +54,13 @@ train:
 
 translate:
   work_model: translate
-  model: examples/sequenceR/data/big/1/big-step-26000-acc-99.72-ppl-1.01-xent-0.01.pt
+  model: examples/sequenceR/data/big/1/big-step-40000-acc-99.72-ppl-1.01-xent-0.01.pt
   src: examples/sequenceR/data/big/test-buggy-src.txt
   tgt: examples/sequenceR/data/big/test-fixed-src.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
-  max_length: 200
-  batch_size: 16
+  max_length: 500
+  batch_size: 32
   gpu: 0
 #  report_align: 'true'

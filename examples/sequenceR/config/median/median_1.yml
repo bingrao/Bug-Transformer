@@ -54,7 +54,7 @@ train:
 
 translate:
   work_model: translate
-  model: examples/sequenceR/data/median/1/median-step-6000-acc-90.99-ppl-1.46-xent-0.38.pt
+  model: examples/sequenceR/data/median/1/median-step-50000-acc-95.84-ppl-1.13-xent-0.12.pt
   src: examples/sequenceR/data/median/test-buggy-src.txt
   tgt: examples/sequenceR/data/median/test-fixed-src.txt
   data_type: "code"

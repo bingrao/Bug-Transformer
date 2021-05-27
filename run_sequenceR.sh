@@ -19,7 +19,7 @@ function help() {
      echo "       target:  [abstract|preprocess|train|translate|all|inference|performance|loop_translate]"
      echo "Example: Using third (or first by default) GPU to train small dataset with small_1.yml config file"
      echo "Example: The default direcotry that system searches config files: ${ProjectPath}/config/[small|median|big|small_old]"
-     echo "       - export CUDA_VISIBLE_DEVICES=2,3; bash run.sh small train small_1.yml"
+     echo "       - export CUDA_VISIBLE_DEVICES=2,3; bash run_sequenceR.sh  small train small_1.yml"
      echo "       - bash run.sh small train small_1.yml"
 }
 
@@ -465,7 +465,7 @@ function _inference() {
   TranslateBestRatio=1.0
 
   logInfo "------------------- Inference Search ------------------------"
-  beam_widths=("25" "30" "35" "40" "45" "50")
+  beam_widths=("1" "5" "10" "15" "20" "25" "30" "35" "40" "45" "50")
 #  beam_widths=("1" "5" "10" "15" "20")
   for beam_width in ${beam_widths[*]}
   do

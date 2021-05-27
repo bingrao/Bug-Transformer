@@ -54,7 +54,7 @@ train:
 
 translate:
   work_model: translate
-  model: examples/sequenceR/data/small/1/small-step-6000-acc-85.43-ppl-1.67-xent-0.51.pt
+  model: examples/sequenceR/data/small/1/small-step-50000-acc-98.03-ppl-1.06-xent-0.06.pt
   src: examples/sequenceR/data/small/test-buggy-src.txt
   tgt: examples/sequenceR/data/small/test-fixed-src.txt
   data_type: "code"
