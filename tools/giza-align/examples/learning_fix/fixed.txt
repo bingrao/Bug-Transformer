@@ -1,0 +1,10 @@
+public java.util.List < TYPE1 > METHOD1 ( ) { return VAR1 ; }
+public TYPE1 . TYPE2 < TYPE3 . TYPE4 > METHOD1 ( TYPE3 . TYPE5 VAR1 , java.lang.String VAR2 , java.util.HashMap < java.lang.String , java.lang.String > parameters ) { return METHOD1 ( VAR1 . toString ( ) , VAR2 , parameters ) ; }
+public static void main ( java.lang.String [ ] args ) throws java.lang.Exception { TYPE1 VAR1 = new TYPE1 ( ) ; VAR1 . METHOD1 ( ) ; VAR1 . METHOD2 ( true ) ; VAR1 . init ( STRING1 ) ; }
+public void METHOD1 ( int VAR1 , java.lang.String VAR2 , long VAR3 ) { if ( VAR1 == 0 ) { IDENT1 . METHOD2 ( java.lang.String . METHOD3 ( VAR3 ) ) ; } else { IDENT1 . error ( VAR1 ) ; } }
+public void METHOD1 ( java.lang.Integer VAR1 ) { this . IDENT2 . remove ( VAR1 ) ; }
+public static void METHOD1 ( android.content.Context context , java.lang.String VAR1 ) { IDENT1 . METHOD2 ( context , VAR1 . toUpperCase ( ) , false ) ; }
+private void METHOD1 ( TYPE1 . TYPE2 VAR1 ) { this . METHOD2 ( VAR1 ) ; this . METHOD3 ( VAR1 ) ; }
+public void METHOD1 ( ) { label . setText ( STRING1 ) ; METHOD2 ( ) ; }
+public static void main ( java.lang.String [ ] a ) { }
+public boolean METHOD1 ( java.lang.String VAR1 ) { return ( METHOD2 ( VAR1 ) ) >= 0 ; }
