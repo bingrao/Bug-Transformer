@@ -66,9 +66,10 @@ train:
   path_encoding: 'false'
 
   master_port: 8001
-  world_size: 1
+  world_size: 2
   gpu_ranks:
     - 0
+    - 1
 
 translate:
   work_model: translate
