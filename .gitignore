@@ -112,4 +112,6 @@ ENV/
 # Tensorboard
 runs/
 
+*.o
+
 examples/learning_fix/bin/code2abs-1.0-jar-with-dependencies.jar

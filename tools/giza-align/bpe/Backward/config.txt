@@ -1,6 +1,0 @@
-C /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/fixed_buggy.snt
-S /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/fixed.vcb
-T /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/buggy.vcb
-CoocurrenceFile  /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/fixed_buggy.cooc
-sourcevocabularyclasses /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/fixed.class
-targetvocabularyclasses /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/buggy.class
