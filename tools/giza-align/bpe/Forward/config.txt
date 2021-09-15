@@ -1,0 +1,9 @@
+C /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/buggy_fixed.snt
+S /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/buggy.vcb
+T /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/fixed.vcb
+CoocurrenceFile /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/buggy_fixed.cooc
+sourcevocabularyclasses /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/buggy.class
+targetvocabularyclasses /home/bing/project/Bug-Transformer/tools/giza-align/examples/learning_fix/fixed.class
+nodumps 0
+onlyaldumps 1
+hmmdumpfrequency 5
