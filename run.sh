@@ -111,7 +111,7 @@ function _abstract() {
   logInfo "------------------- Code Abstract ------------------------"
 
   export JAVA_OPTS="-Xmx32G -Xms1g -Xss512M -Dlog4j.configuration=file:///${ConfigPath}/log4j.properties"
-#  scala "${BinPath}"/code2abs-1.0-jar-with-dependencies.jar -config "${ConfigFile}" | tee -a "${LogFile}"
+  scala "${BinPath}"/code2abs-1.0-jar-with-dependencies.jar -config "${ConfigFile}" | tee -a "${LogFile}"
 #  scala "${BinPath}"/code2abs-1.0-jar-with-dependencies.jar -run_type "abstract" \
 #        -buggy_path "examples/learning_fix/data/${dataset}/raw/buggy/" \
 #        -fixed_path "examples/learning_fix/data/${dataset}/raw/fixed/" \

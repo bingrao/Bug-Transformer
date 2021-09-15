@@ -27,8 +27,8 @@ if [ -z "${MGIZA_DIR}" ]; then
 fi
 
 for mode in "train" "eval" "test"; do
-  rm -fr "${DataPath}"/alignment/*
-
+  echo "###############################  ${mode}   #############################################"
+  rm -fr "${DataPath}"/alignment/${mode}
   OutDir=${DataPath}/alignment/${mode}; [ -d "$OutDir" ] || mkdir -p "$OutDir"
   FeedwardDir=${DataPath}/alignment/${mode}/feedward; [ -d "$FeedwardDir" ] || mkdir -p "$FeedwardDir"
   BackwardDir=${DataPath}/alignment/${mode}/backward; [ -d "$BackwardDir" ] || mkdir -p "$BackwardDir"
@@ -51,6 +51,7 @@ for mode in "train" "eval" "test"; do
   wait
 
   # Feedward
+  echo "###############################  ${mode} Feedward  #############################################"
   "${MGIZA_DIR}"/snt2cooc.out  "${prefix_source}.vcb" "${prefix_target}.vcb" \
                                "${prefix_source}_${target_name}.snt" > \
                                "${prefix_source}"_${target_name}.cooc &
@@ -63,9 +64,10 @@ for mode in "train" "eval" "test"; do
                         -CoocurrenceFile "${prefix_source}"_${target_name}.cooc \
                         -outputpath "${FeedwardDir}"
 
-  python "${SCRIPT_DIR}"/a3ToTalp.py < "${FeedwardDir}"/*.AA3.final > "${FeedwardDir}"/${mode}-feedward.talp
+  python "${SCRIPT_DIR}"/a3ToTalp.py < "${FeedwardDir}"/*.AA3.final > "${FeedwardDir}"/"${dataset}-${mode}-feedward.talp"
 
   # Backward
+  echo "###############################  ${mode}  Backward #############################################"
   "${MGIZA_DIR}"/snt2cooc.out  "${prefix_target}.vcb" "${prefix_source}.vcb" \
                                "${prefix_target}_${source_name}.snt" > \
                                "${prefix_target}"_${source_name}.cooc &
@@ -78,6 +80,6 @@ for mode in "train" "eval" "test"; do
                         -CoocurrenceFile "${prefix_target}"_${source_name}.cooc \
                         -outputpath "${BackwardDir}"
 
-  python "${SCRIPT_DIR}"/a3ToTalp.py < "${BackwardDir}"/*.AA3.final > "${BackwardDir}"/${mode}-backward.talp
+  python "${SCRIPT_DIR}"/a3ToTalp.py < "${BackwardDir}"/*.AA3.final > "${BackwardDir}"/"${dataset}-${mode}-backward.talp"
 
 done
