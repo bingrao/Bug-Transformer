@@ -5,12 +5,14 @@ preprocess:
   train_src_path: examples/learning_fix/data/small/train-buggy-path.txt
   train_tgt: examples/learning_fix/data/small/train-fixed.txt
   train_tgt_path: examples/learning_fix/data/small/train-fixed-path.txt
-
+  train_align: examples/learning_fix/data/small/small-train-feedward.talp
 
   valid_src: examples/learning_fix/data/small/eval-buggy.txt
   valid_src_path: examples/learning_fix/data/small/eval-buggy-path.txt
   valid_tgt: examples/learning_fix/data/small/eval-fixed.txt
   valid_tgt_path: examples/learning_fix/data/small/eval-fixed-path.txt
+  valid_align: examples/learning_fix/data/small/small-eval-feedward.talp
+
 
   save_data: examples/learning_fix/data/small/small
   src_seq_length: 46680
@@ -62,14 +64,16 @@ train:
 
   param_init: 0.0
   param_init_glorot: 'true'
-  position_encoding: 'true'
+  position_encoding: 'false'
   path_encoding: 'false'
 
   master_port: 8001
-  world_size: 2
+  world_size: 4
   gpu_ranks:
     - 0
     - 1
+    - 2
+    - 3
 
 translate:
   work_model: translate
