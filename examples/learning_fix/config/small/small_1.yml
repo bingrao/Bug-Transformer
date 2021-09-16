@@ -46,18 +46,21 @@ train:
   transformer_ff: 2048
   heads: 8
 
-  accum_count: 8
+  accum_count: [4]
+  accum_steps: [0]
+  model_dtype: "fp32"
   optim: adam
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
   learning_rate: 0.01
-  max_grad_norm: 5
+  max_grad_norm: 0
 
   batch_size: 2048
   batch_type: tokens
   normalization: tokens
   dropout: 0.2
+  attention_dropout: [0.1]
   label_smoothing: 0.1
 
   max_generator_batches: 0
