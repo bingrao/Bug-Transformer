@@ -1,9 +1,19 @@
 preprocess:
   work_model: preprocess
+
   train_src: examples/learning_fix/data/median/train-buggy.txt
+  train_src_path: examples/learning_fix/data/median/train-buggy-path.txt
   train_tgt: examples/learning_fix/data/median/train-fixed.txt
+  train_tgt_path: examples/learning_fix/data/median/train-fixed-path.txt
+  train_align: examples/learning_fix/data/median/median-train-feedward.talp
+
   valid_src: examples/learning_fix/data/median/eval-buggy.txt
+  valid_src_path: examples/learning_fix/data/median/eval-buggy-path.txt
   valid_tgt: examples/learning_fix/data/median/eval-fixed.txt
+  valid_tgt_path: examples/learning_fix/data/median/eval-fixed-path.txt
+  valid_align: examples/learning_fix/data/median/median-eval-feedward.talp
+
+
   save_data: examples/learning_fix/data/median/median
   src_seq_length: 65455
   tgt_seq_length: 65455
@@ -36,25 +46,34 @@ train:
   transformer_ff: 2048
   heads: 8
 
-  accum_count: 8
+  accum_count: [4]
+  accum_steps: [0]
+  model_dtype: "fp32"
   optim: adam
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
   learning_rate: 0.01
-  max_grad_norm: 5
+  max_grad_norm: 0
 
   batch_size: 4096
   batch_type: tokens
   normalization: tokens
   dropout: 0.2
+  attention_dropout: [0.1]
   label_smoothing: 0.1
 
-  max_generator_batches: 2
+  max_generator_batches: 0
 
   param_init: 0.0
   param_init_glorot: 'true'
   position_encoding: 'true'
+  path_encoding: 'false'
+
+  lambda_align: 0.05
+  alignment_layer: -1
+  alignment_heads: 4
+full_context_alignment: true
 
   master_port: 8002
   world_size: 4
@@ -68,7 +87,9 @@ translate:
   work_model: translate
   model: examples/learning_fix/data/median/1/median-step-80000-acc-96.36-ppl-1.16-xent-0.15.pt
   src: examples/learning_fix/data/median/test-buggy.txt
+  src_path: examples/learning_fix/data/median/test-buggy-path.txt
   tgt: examples/learning_fix/data/median/test-fixed.txt
+  tgt_path: examples/learning_fix/data/median/test-fixed-path.txt
   data_type: "code"
   share_vocab: True
   min_length: 0

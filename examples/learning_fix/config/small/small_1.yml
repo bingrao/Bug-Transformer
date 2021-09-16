@@ -67,7 +67,7 @@ train:
 
   param_init: 0.0
   param_init_glorot: 'true'
-  position_encoding: 'false'
+  position_encoding: 'true'
   path_encoding: 'false'
 
   lambda_align: 0.05
