@@ -137,6 +137,14 @@ function _abstract() {
   OutputFixedFile=${OutputFixedDir}/total/fixed.txt
   OutputFixedPathFile=${OutputFixedDir}/total/fixed_path.txt
 
+  if [ -d "${InputBuggyDir}" ]; then
+     InputBuggyDir="${InputBuggyDir}_src.txt"
+  fi
+
+  if [ -d "${InputFixedDir}" ]; then
+     InputFixedDir="${InputFixedDir}_src.txt"
+  fi
+
   logInfo "Check ${OutputBuggyFile} if exist"
   [ -f "${OutputBuggyFile}" ] || exit 1
 
@@ -154,9 +162,9 @@ function _abstract() {
 
   train_cnt="$(echo "scale=0; $buggy_cnt *  0.8 / 1" | bc)"
   eval_cnt="$(echo "scale=0; $buggy_cnt *  0.1 / 1" | bc)"
-
+#  set -ex
   logInfo "BLUE value <buggy_src.txt, fixed_src.txt>, count: ${buggy_cnt}"
-  "${BinPath}"/multi-bleu.perl "${InputBuggyDir}" < "${OutputFixedFile}" | tee -a "${LogFile}"
+  "${BinPath}"/multi-bleu.perl "${InputBuggyDir}" < "${InputFixedDir}" | tee -a "${LogFile}"
 
   logInfo "BLUE value <buggy.txt, fixed.txt>, count: ${buggy_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyFile}" < "${OutputFixedFile}" | tee -a "${LogFile}"
@@ -177,10 +185,11 @@ function _abstract() {
   mv ./train-fixed-pathaa "${OutputFixedDir}"/train-fixed-path.txt
 
   logInfo "BLUE value <train-buggy-src.txt, train-fixed-src.txt>, count: ${train_cnt}"
-  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy-src.txt < "${InputFixedDir}"/train-fixed-src.txt | tee -a "${LogFile}"
+  "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy-src.txt < "${OutputBuggyDir}"/train-fixed-src.txt | tee -a "${LogFile}"
 
   logInfo "BLUE value <train-buggy.txt, train-fixed.txt>, count: ${train_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/train-buggy.txt < "${OutputFixedDir}"/train-fixed.txt | tee -a "${LogFile}"
+
 
   split -l "${eval_cnt}" ./train-buggy-srcab eval-buggy-src; rm -fr train-buggy-srcab
   split -l "${eval_cnt}" ./train-buggyab eval-buggy; rm -fr train-buggyab
@@ -203,6 +212,7 @@ function _abstract() {
 
   logInfo "BLUE value <eval-buggy.txt, eval-fixed.txt>, count: ${eval_cnt}"
   "${BinPath}"/multi-bleu.perl "${OutputBuggyDir}"/eval-buggy.txt < "${OutputFixedDir}"/eval-fixed.txt | tee -a "${LogFile}"
+
 
   mv ./eval-buggy-srcab "${OutputBuggyDir}"/test-buggy-src.txt
   mv ./eval-buggyab "${OutputBuggyDir}"/test-buggy.txt
