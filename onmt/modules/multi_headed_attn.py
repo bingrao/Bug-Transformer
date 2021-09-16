@@ -159,11 +159,11 @@ class MultiHeadedAttention(nn.Module):
                 layer_cache["memory_keys"] = key
                 layer_cache["memory_values"] = value
         else:
-            key = self.linear_keys(key)
+            key = self.linear_keys(key)     # torch.Size([40, 31, 512]) --> torch.Size([40, 31, 512])
             value = self.linear_values(value)
             query = self.linear_query(query)
-            key = shape(key)
-            value = shape(value)
+            key = shape(key)    # torch.Size([40, 31, 512]) --> torch.Size([40, 8, 31, 64])
+            value = shape(value)    # torch.Size([40, 31, 512]) --> torch.Size([40, 8, 31, 64])
 
         if self.max_relative_positions > 0 and attn_type == "self":
             key_len = key.size(2)
@@ -178,15 +178,15 @@ class MultiHeadedAttention(nn.Module):
             relations_values = self.relative_positions_embeddings(
                 relative_positions_matrix.to(key.device))
 
-        query = shape(query)
+        query = shape(query)    # torch.Size([40, 31, 512]) --> torch.Size([40, 8, 31, 64])
 
         key_len = key.size(2)
         query_len = query.size(2)
 
         # 2) Calculate and scale scores.
-        query = query / math.sqrt(dim_per_head)
+        query = query / math.sqrt(dim_per_head)     # torch.Size([40, 8, 31, 64])
         # batch x num_heads x query_len x key_len
-        query_key = torch.matmul(query, key.transpose(2, 3))
+        query_key = torch.matmul(query, key.transpose(2, 3))    # torch.Size([40, 8, 31, 31])
 
         if self.max_relative_positions > 0 and attn_type == "self":
             scores = query_key + relative_matmul(query, relations_keys, True)
@@ -199,10 +199,10 @@ class MultiHeadedAttention(nn.Module):
             scores = scores.masked_fill(mask, -1e18)
 
         # 3) Apply attention dropout and compute context vectors.
-        attn = self.softmax(scores).to(query.dtype)
+        attn = self.softmax(scores).to(query.dtype)     # torch.Size([40, 8, 31, 31])
         drop_attn = self.dropout(attn)
 
-        context_original = torch.matmul(drop_attn, value)
+        context_original = torch.matmul(drop_attn, value)   # torch.Size([40, 8, 31, 64])
 
         if self.max_relative_positions > 0 and attn_type == "self":
             context = unshape(context_original
@@ -210,7 +210,7 @@ class MultiHeadedAttention(nn.Module):
                                                 relations_values,
                                                 False))
         else:
-            context = unshape(context_original)
+            context = unshape(context_original)     # torch.Size([40, 31, 512])
 
         output = self.final_linear(context)
         # CHECK

@@ -96,12 +96,12 @@ class TransformerDecoderLayerBase(nn.Module):
         """
         with_align = kwargs.pop("with_align", False)
         output, attns = self._forward(*args, **kwargs)
-        top_attn = attns[:, 0, :, :].contiguous()
+        top_attn = attns[:, 0, :, :].contiguous()       # torch.Size([40, 8, 31, 48]) --> torch.Size([40, 31, 48])
         attn_align = None
         if with_align:
             if self.full_context_alignment:
                 # return _, (B, Q_len, K_len)
-                _, attns = self._forward(*args, **kwargs, future=True)
+                _, attns = self._forward(*args, **kwargs, future=True)      # torch.Size([40, 8, 31, 48])
 
             if self.alignment_heads > 0:
                 attns = attns[:, : self.alignment_heads, :, :].contiguous()
@@ -109,7 +109,7 @@ class TransformerDecoderLayerBase(nn.Module):
             # Case 1: no full_context, no align heads -> layer avg baseline
             # Case 2: no full_context, 1 align heads -> guided align
             # Case 3: full_context, 1 align heads -> full cte guided align
-            attn_align = attns.mean(dim=1)
+            attn_align = attns.mean(dim=1)  # torch.Size([40, 2, 31, 48]) -> torch.Size([40, 31, 48])
         return output, top_attn, attn_align
 
     def update_dropout(self, dropout, attention_dropout):

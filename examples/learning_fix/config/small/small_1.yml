@@ -60,12 +60,17 @@ train:
   dropout: 0.2
   label_smoothing: 0.1
 
-  max_generator_batches: 2
+  max_generator_batches: 0
 
   param_init: 0.0
   param_init_glorot: 'true'
   position_encoding: 'false'
   path_encoding: 'false'
+
+  lambda_align: 0.05
+  alignment_layer: -1
+  alignment_heads: 4
+  full_context_alignment: true
 
   master_port: 8001
   world_size: 4

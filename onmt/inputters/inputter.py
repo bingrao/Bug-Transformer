@@ -79,7 +79,7 @@ class AlignField(LabelField):
                 # +1 for tgt side to keep coherent after "bos" padding,
                 # register ['N°_in_batch', 'tgt_id+1', 'src_id']
                 sparse_idx.append([i, tgt + 1, src])
-
+        # torch.Size([1021, 3]), N x [batch_id, tgt + 1, src]
         align_idx = torch.tensor(sparse_idx, dtype=self.dtype, device=device)
 
         return align_idx

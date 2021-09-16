@@ -336,6 +336,7 @@ class CommonLossCompute(LossComputeBase):
             coverage_loss = self._compute_coverage_loss(
                 std_attn=std_attn, coverage_attn=coverage_attn)
             loss += coverage_loss
+
         if self.lambda_align != 0.0:
             if align_head.dtype != loss.dtype:  # Fix FP16
                 align_head = align_head.to(loss.dtype)
@@ -373,7 +374,7 @@ class CommonLossCompute(LossComputeBase):
         align_matrix_size = [batch_size, pad_tgt_size, pad_src_size]
         ref_align = onmt.utils.make_batch_align_matrix(
             align_idx, align_matrix_size, normalize=True
-        )
+        )   # torch.Size([40, 32, 48])
         # NOTE: tgt-src ref alignement that in range_ of shard
         # (coherent with batch.tgt)
         shard_state.update(
@@ -385,8 +386,8 @@ class CommonLossCompute(LossComputeBase):
 
     def _compute_alignement_loss(self, align_head, ref_align):
         """Compute loss between 2 partial alignment matrix."""
-        # align_head contains value in [0, 1) presenting attn prob,
-        # 0 was resulted by the context attention src_pad_mask
+        # align_head contains value in [0, 1) presenting attn prob, torch.Size([2, 31, 48])
+        # 0 was resulted by the context attention src_pad_mask, torch.Size([2, 31, 48])
         # So, the correspand position in ref_align should also be 0
         # Therefore, clip align_head to > 1e-18 should be bias free.
         align_loss = -align_head.clamp(min=1e-18).log().mul(ref_align).sum()
