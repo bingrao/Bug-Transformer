@@ -76,16 +76,13 @@ train:
 full_context_alignment: true
 
   master_port: 8002
-  world_size: 4
+  world_size: 2
   gpu_ranks:
     - 0
     - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/median/1/median-step-80000-acc-96.36-ppl-1.16-xent-0.15.pt
   src: examples/learning_fix/data/median/test-buggy.txt
   src_path: examples/learning_fix/data/median/test-buggy-path.txt
   tgt: examples/learning_fix/data/median/test-fixed.txt

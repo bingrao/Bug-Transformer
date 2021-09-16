@@ -28,7 +28,6 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/big/big
-  train_from: examples/learning_fix/data/big/1/big-step-28000-acc-91.03-ppl-1.40-xent-0.34.pt
   save_checkpoint_steps: 3000
   keep_checkpoint: 100
   seed: 3435
