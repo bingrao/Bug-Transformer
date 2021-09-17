@@ -73,7 +73,7 @@ class NMTModel(BaseModel):
             src_path_vec = None
             src_path_state = None
 
-        enc_state, memory_bank, lengths = self.encoder(src, lengths, position=src_pos, src_path_vec=src_path_vec)
+        enc_state, memory_bank, lengths = self.encoder(src, lengths, position=src_pos)
 
         if not bptt:
             self.decoder.init_state(src, memory_bank, enc_state)
@@ -94,7 +94,7 @@ class NMTModel(BaseModel):
         dec_out, attns = self.decoder(dec_in, memory_bank,
                                       memory_lengths=lengths,
                                       with_align=with_align,
-                                      position=tgt_pos, tgt_path_vec=tgt_path_vec)
+                                      position=tgt_pos)
 
         return dec_out, attns, tgt_path_output, tgt_path_attns
 

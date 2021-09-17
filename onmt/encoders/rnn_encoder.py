@@ -178,7 +178,7 @@ class PathRNNEncoder(EncoderBase):
 
         x_path_len, perm_idx = x_path_len.sort(0, descending=True)
         x_path = x_path[perm_idx]
-        emb = self.embeddings(x_path.unsqueeze(-1)).transpose(0, 1)
+        emb = self.embeddings(x_path.unsqueeze(-1)).transpose(0, 1)     # torch.Size([1886, 21]) -> torch.Size([21, 1886, 512])
         if lengths is None:
             lengths = x_path_len
 
@@ -189,8 +189,8 @@ class PathRNNEncoder(EncoderBase):
             lengths_list = lengths.view(-1).tolist()
             packed_emb = pack(emb, lengths_list)
 
-        # memory_bank, [p, b*l, dim], torch.Size([16, 3901, 512])
-        # state -> [hidden, cell], [1, b*l, dim], torch.Size([1, 3901, 512])
+        # memory_bank, [p, b*l, dim], torch.Size([21, 1886, 512])
+        # state -> [hidden, cell], [1, b*l, dim], torch.Size([1, 1886, 512])
         memory_bank, (final_hidden, final_cell) = self.rnn(packed_emb)
 
         if lengths is not None and not self.no_pack_padded_seq:
@@ -209,7 +209,7 @@ class PathRNNEncoder(EncoderBase):
                                  x_example_len.cpu().detach().tolist(), dim=0)
 
         src_len = kwargs.get('src_len', 100)
-        # src_path_vec, [b, p_l, dim], torch.Size([83, 47, 512])
+        # src_path_vec, [b, p_l, dim], torch.Size([41, 46, 512])
         src_path_vec = torch.stack([torch.nn.functional.pad(x, pad=[0, 0, 0, src_len - x.size(0)],
                                                             mode='constant', value=0) for x in output_bag])
 

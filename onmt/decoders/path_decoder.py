@@ -55,7 +55,7 @@ class PathRNNDecoder(RNNDecoderBase):
         x_path, x_example_len, x_path_len = tgt
         x_path_len, perm_idx = x_path_len.sort(0, descending=True)
         x_path = x_path[perm_idx]
-        emb = self.embeddings(x_path.unsqueeze(-1)).transpose(0, 1)
+        emb = self.embeddings(x_path.unsqueeze(-1)).transpose(0, 1)     # torch.Size([1923, 22]) --> torch.Size([22, 1923, 512])
 
         lengths = x_path_len
         packed_emb = emb
@@ -72,10 +72,10 @@ class PathRNNDecoder(RNNDecoderBase):
         if isinstance(self.rnn, nn.GRU):
             rnn_output, (final_hidden, final_cell) = self.rnn(packed_emb)
         else:
-            rnn_output, (final_hidden, final_cell) = self.rnn(packed_emb)
+            rnn_output, (final_hidden, final_cell) = self.rnn(packed_emb)   # final_hidden/final_cell torch.Size([1, 1923, 512]),
 
         if lengths is not None:
-            rnn_output, _ = unpack(rnn_output)
+            rnn_output, _ = unpack(rnn_output)     # torch.Size([22, 1923, 512])
 
         sorted_idx, reversed_perm_idx = perm_idx.sort(0)
         final_hidden = final_hidden[:, reversed_perm_idx, :]
@@ -91,17 +91,17 @@ class PathRNNDecoder(RNNDecoderBase):
 
         output_bag = torch.split(final_hidden.squeeze(0),
                                  x_example_len.cpu().detach().tolist(), dim=0)
-
+        # torch.Size([41, 49, 512])
         tgt_path_vec = torch.stack([torch.nn.functional.pad(x, pad=[0, 0, 0, kwargs.get("tgt_len", 100) - x.size(0)],
                                                             mode='constant', value=0) for x in output_bag])
 
         # Calculate the attention.
         if not self.attentional:
             dec_outs = rnn_output
-        else:
+        else: # dec_outs: torch.Size([49, 41, 512]), p_attn: [tgt_len, batch_size, src_len] torch.Size([49, 41, 46])
             dec_outs, p_attn = self.attn(tgt_path_vec, memory_bank,
-                                         memory_lengths=memory_lengths)
-            attns["std"] = p_attn
+                                         memory_lengths=memory_lengths)  # memory_bank: torch.Size([41, 46, 512])
+            attns["align"] = p_attn.transpose(0, 1)
 
         # Calculate the context gate.
         if self.context_gate is not None:

@@ -5,12 +5,14 @@ preprocess:
   train_src_path: examples/learning_fix/data/small/train-buggy-path.txt
   train_tgt: examples/learning_fix/data/small/train-fixed.txt
   train_tgt_path: examples/learning_fix/data/small/train-fixed-path.txt
-
+  train_align: examples/learning_fix/data/small/small-train-feedward.talp
 
   valid_src: examples/learning_fix/data/small/eval-buggy.txt
   valid_src_path: examples/learning_fix/data/small/eval-buggy-path.txt
   valid_tgt: examples/learning_fix/data/small/eval-fixed.txt
   valid_tgt_path: examples/learning_fix/data/small/eval-fixed-path.txt
+  valid_align: examples/learning_fix/data/small/small-eval-feedward.talp
+
 
   save_data: examples/learning_fix/data/small/small
   src_seq_length: 46680
@@ -26,7 +28,7 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  save_checkpoint_steps: 5000
+  save_checkpoint_steps: 2000
   keep_checkpoint: 1000
   seed: 3435
   train_steps: 100000
@@ -44,43 +46,43 @@ train:
   transformer_ff: 2048
   heads: 8
 
-  accum_count: 8
+  accum_count: [4]
+  accum_steps: [0]
+  model_dtype: "fp32"
   optim: adam
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
   learning_rate: 0.01
-  max_grad_norm: 5
+  max_grad_norm: 0
 
-  batch_size: 4096
+  batch_size: 2048
   batch_type: tokens
   normalization: tokens
-  dropout: 0.1
+  dropout: 0.2
+  attention_dropout: [0.1]
   label_smoothing: 0.1
 
-  max_generator_batches: 2
+  max_generator_batches: 0
 
   param_init: 0.0
   param_init_glorot: 'true'
   position_encoding: 'true'
-  path_encoding: 'false'
-  share_embeddings: 'true'
-  share_decoder_embeddings: 'true'
-#  lambda_coverage: 0.5
-#  lambda_align: 0.5
-#  coverage_attn: 'true'
+  path_encoding: 'true'
+
+  lambda_align: 0.05
+  alignment_layer: -1
+  alignment_heads: 4
+  full_context_alignment: true
 
   master_port: 8003
-  world_size: 4
+  world_size: 2
   gpu_ranks:
     - 0
     - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate
-  model: examples/learning_fix/data/small/3/small-step-45000-acc-96.06-ppl-1.15-xent-0.14.pt
   src: examples/learning_fix/data/small/test-buggy.txt
   src_path: examples/learning_fix/data/small/test-buggy-path.txt
   tgt: examples/learning_fix/data/small/test-fixed.txt
@@ -89,6 +91,6 @@ translate:
   share_vocab: True
   min_length: 0
   max_length: 100
-  batch_size: 512
+  batch_size: 16
   gpu: 0
 #  report_align: 'true'

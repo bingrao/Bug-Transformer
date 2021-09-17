@@ -13,7 +13,7 @@ from torch.autograd import Variable
 from onmt.constants import ModelTask
 
 
-def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
+def build_loss_compute(model, tgt_field, opt, train=True):
     """
     Returns a LossCompute subclass which wraps around an nn.Module subclass
     (such as nn.NLLLoss) which defines the loss criterion. The LossCompute
@@ -29,7 +29,7 @@ def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
 
     if opt.lambda_coverage != 0:
         assert opt.coverage_attn, "--coverage_attn needs to be set in " \
-                                  "order to use --lambda_coverage != 0"
+            "order to use --lambda_coverage != 0"
 
     if opt.copy_attn:
         criterion = onmt.modules.CopyGeneratorLoss(
@@ -58,10 +58,7 @@ def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
     # loss function of this kind is the sparsemax loss.
     use_raw_logits = isinstance(criterion, SparsemaxLoss)
 
-    if path_loss:
-        loss_gen = model.path_generator[0] if use_raw_logits else model.path_generator
-    else:
-        loss_gen = model.generator[0] if use_raw_logits else model.generator
+    loss_gen = model.generator[0] if use_raw_logits else model.generator
 
     if opt.copy_attn:
         if opt.model_task == ModelTask.SEQ2SEQ:
@@ -83,13 +80,9 @@ def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
     else:
         if opt.model_task == ModelTask.SEQ2SEQ:
             compute = NMTLossCompute(
-                criterion,
-                loss_gen,
-                lambda_coverage=opt.lambda_coverage,
-                lambda_align=opt.lambda_align,
-                path_loss=path_loss,
-                loss_uncertainty=opt.loss_uncertainty
-            )
+                criterion, loss_gen, lambda_coverage=opt.lambda_coverage,
+                loss_uncertainty=opt.loss_uncertainty,
+                lambda_align=opt.lambda_align)
         elif opt.model_task == ModelTask.LANGUAGE_MODEL:
             assert (
                     opt.lambda_align == 0.0
@@ -98,7 +91,7 @@ def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
                 criterion,
                 loss_gen,
                 lambda_coverage=opt.lambda_coverage,
-                lambda_align=opt.lambda_align, path_loss=path_loss
+                lambda_align=opt.lambda_align
             )
         else:
             raise ValueError(
@@ -128,17 +121,16 @@ class LossComputeBase(nn.Module):
         normalzation (str): normalize by "sents" or "tokens"
     """
 
-    def __init__(self, criterion, generator, path_loss=False, **kwargs):
+    def __init__(self, criterion, generator, **kwargs):
         super(LossComputeBase, self).__init__()
         self.criterion = criterion
         self.generator = generator
-        self.path_loss = path_loss
 
     @property
     def padding_idx(self):
         return self.criterion.ignore_index
 
-    def _make_shard_state(self, batch, output, range_, attns=None):
+    def _make_shard_state(self, batch, output, range_, attns=None, attns_path=None):
         """
         Make shard state dictionary for shards() to return iterable
         shards for efficient loss computation. Subclass must define
@@ -172,7 +164,7 @@ class LossComputeBase(nn.Module):
                  normalization=1.0,
                  shard_size=0,
                  trunc_start=0,
-                 trunc_size=None):
+                 trunc_size=None, **kwargs):
         """Compute the forward loss, possibly in shards in which case this
         method also runs the backward pass and returns ``None`` as the loss
         value.
@@ -202,26 +194,17 @@ class LossComputeBase(nn.Module):
         """
         if trunc_size is None:
             trunc_size = batch.tgt.size(0) - trunc_start
+        attns_path = kwargs.get("attns_path", None)
         trunc_range = (trunc_start, trunc_start + trunc_size)
-        shard_state = self._make_shard_state(batch, output, trunc_range, attns)
+        shard_state = self._make_shard_state(batch, output, trunc_range, attns, attns_path)
         if shard_size == 0:
-            _loss, stats, match_loss = self._compute_loss(batch, **shard_state)
-            loss = _loss / float(normalization)
-            # loss = loss - match_loss * 0.001
-            return loss, stats
-
+            loss, stats = self._compute_loss(batch, **shard_state, **kwargs)
+            return loss / float(normalization), stats
         batch_stats = onmt.utils.Statistics()
-
         # shard['output'].shape, torch.Size([2, 61, 512]), shard['target'].shape: torch.Size([2, 61])
-        for idx, shard in enumerate(shards(shard_state, shard_size)):
-            _loss, stats, match_loss = self._compute_loss(batch, **shard)
-            loss = _loss.div(float(normalization))
-
-            # if match_loss.float() >= 0.1:
-            #     logger.info(f"[********] The match loss is : {match_loss} -- {loss}")
-
-            # loss = loss - match_loss * 0.001
-            loss.backward()
+        for shard in shards(shard_state, shard_size):
+            loss, stats = self._compute_loss(batch, **shard, **kwargs)
+            loss.div(float(normalization)).backward()
             batch_stats.update(stats)
         return None, batch_stats
 
@@ -287,8 +270,8 @@ class CommonLossCompute(LossComputeBase):
     """
 
     def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0, tgt_shift_index=1, path_loss=False, **kwargs):
-        super(CommonLossCompute, self).__init__(criterion, generator, path_loss, **kwargs)
+                 lambda_coverage=0.0, lambda_align=0.0, tgt_shift_index=1, **kwargs):
+        super(CommonLossCompute, self).__init__(criterion, generator, **kwargs)
         self.lambda_coverage = lambda_coverage
         self.lambda_align = lambda_align
         self.tgt_shift_index = tgt_shift_index
@@ -298,7 +281,34 @@ class CommonLossCompute(LossComputeBase):
             self.tgt_log_var = torch.nn.Parameter(torch.zeros(1), requires_grad=True)
             self.align_log_var = torch.nn.Parameter(torch.zeros(1), requires_grad=True)
 
-    def _add_coverage_shard_state(self, shard_state, attns):
+    def _make_shard_state(self, batch, output, range_, attns=None, attns_path=None):
+        """
+
+        :param batch:
+        :param output: output.shape: [tgt_len, batch_size, dim] e.g. torch.Size([67, 61, 512])
+        :param range_:
+        :param attns:
+        :return:
+        """
+        range_start = range_[0] + self.tgt_shift_index
+        range_end = range_[1]
+        shard_state = {
+            # output.shape: [tgt_len, batch_size, dim] e.g.torch.Size([67, 61, 512])
+            # target.shape: [tgt_len, batch_size] e.g.torch.Size([67, 61])
+            "output": output,
+            "target": batch.tgt[range_[0] + 1: range_[1], :, 0].contiguous(),
+        }
+
+        if self.lambda_coverage != 0.0:
+            self._add_coverage_shard_state(shard_state, attns, attns_path)
+        if self.lambda_align != 0.0:
+            self._add_align_shard_state(
+                shard_state, batch, range_start, range_end, attns, attns_path
+            )
+        return shard_state
+
+
+    def _add_coverage_shard_state(self, shard_state, attns, attns_path=None):
         coverage = attns.get("coverage", None)
         std = attns.get("std", None)
         assert attns is not None
@@ -315,7 +325,7 @@ class CommonLossCompute(LossComputeBase):
                             "coverage_attn": coverage})
 
     def _compute_loss(self, batch, output, target, std_attn=None,
-                      coverage_attn=None, align_head=None, ref_align=None):
+                      coverage_attn=None, align_head=None, ref_align=None, **kwargs):
         """
 
         :param batch:
@@ -336,7 +346,7 @@ class CommonLossCompute(LossComputeBase):
         # gtruth.shape: [shard_size*batch_size] e.g. torch.Size([122])
         gtruth = target.view(-1)
 
-        match_loss = get_max_match_greedy_decode(scores, gtruth).div(float(gtruth.shape[0]))
+        # match_loss = get_max_match_greedy_decode(scores, gtruth).div(float(gtruth.shape[0]))
 
         # scores [shard_size*batch_size, vocab_size], torch.Size([166, 558]),
         # gtruth: [shard_size*batch_size], torch.Size([166])
@@ -358,7 +368,7 @@ class CommonLossCompute(LossComputeBase):
             loss += align_loss
         stats = self._stats(loss.clone(), scores, gtruth)
 
-        return loss, stats, match_loss
+        return loss, stats
 
     def _compute_coverage_loss(self, std_attn, coverage_attn):
         covloss = torch.min(std_attn, coverage_attn).sum()
@@ -366,9 +376,14 @@ class CommonLossCompute(LossComputeBase):
         return covloss
 
     def _add_align_shard_state(self, shard_state, batch, range_start,
-                               range_end, attns):
+                               range_end, attns, attns_path=None):
         # attn_align should be in (batch_size, pad_tgt_size, pad_src_size)
         attn_align = attns.get("align", None)
+        if attns_path:
+            attn_path_align = attns_path.get("align", None)
+            if attn_path_align is not None:
+                attn_align = attn_align + attn_path_align
+
         # align_idx should be a Tensor in size([N, 3]), N is total number
         # of align src-tgt pair in current batch, each as
         # ['sent_N°_in_batch', 'tgt_id+1', 'src_id'] (check AlignField)
@@ -406,36 +421,6 @@ class CommonLossCompute(LossComputeBase):
             align_loss *= self.lambda_align
         return align_loss
 
-    def _make_shard_state(self, batch, output, range_, attns=None):
-        """
-
-        :param batch:
-        :param output: output.shape: [tgt_len, batch_size, dim] e.g. torch.Size([67, 61, 512])
-        :param range_:
-        :param attns:
-        :return:
-        """
-        range_start = range_[0] + self.tgt_shift_index
-        range_end = range_[1]
-        shard_state = {
-            # output.shape: [tgt_len, batch_size, dim] e.g.torch.Size([67, 61, 512])
-            # target.shape: [tgt_len, batch_size] e.g.torch.Size([67, 61])
-            "output": output,
-        }
-
-        if self.path_loss and hasattr(batch, 'tgt_path'):
-            shard_state['target'] = batch.tgt_path[0].transpose(0, 1).contiguous()
-        else:
-            shard_state["target"] = batch.tgt[range_[0] + 1: range_[1], :, 0].contiguous()
-
-        if self.lambda_coverage != 0.0:
-            self._add_coverage_shard_state(shard_state, attns)
-        if self.lambda_align != 0.0:
-            self._add_align_shard_state(
-                shard_state, batch, range_start, range_end, attns
-            )
-        return shard_state
-
 
 class NMTLossCompute(CommonLossCompute):
     """
@@ -443,13 +428,12 @@ class NMTLossCompute(CommonLossCompute):
     """
 
     def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0, path_loss=False, **kwargs):
+                 lambda_coverage=0.0, lambda_align=0.0, **kwargs):
         super(NMTLossCompute, self).__init__(criterion, generator,
                                              normalization=normalization,
                                              lambda_coverage=lambda_coverage,
                                              lambda_align=lambda_align,
-                                             tgt_shift_index=1,
-                                             path_loss=path_loss, **kwargs)
+                                             tgt_shift_index=1, **kwargs)
 
 
 class LMLossCompute(CommonLossCompute):
@@ -458,12 +442,12 @@ class LMLossCompute(CommonLossCompute):
     """
 
     def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0, path_loss=False):
+                 lambda_coverage=0.0, lambda_align=0.0):
         super(LMLossCompute, self).__init__(criterion, generator,
                                             normalization=normalization,
                                             lambda_coverage=lambda_coverage,
                                             lambda_align=lambda_align,
-                                            tgt_shift_index=0, path_loss=path_loss)
+                                            tgt_shift_index=0)
 
 
 def filter_shard_state(state, shard_size=None):
