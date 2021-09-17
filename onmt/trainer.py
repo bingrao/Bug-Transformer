@@ -191,15 +191,13 @@ class Trainer(object):
                                                                      alpha=opt.transformer_scheduled_alpha)
         else:
             self._scheduled_activation_function = torch.nn.Softmax(dim=-1)
-
+        self.translator = None
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
             if self.accum_count_l[i] > 1:
                 assert self.trunc_size == 0, \
                     """To enable accumulated gradients,
                        you must disable target sequence truncating."""
-
-        self.translator = None
 
         # Set model in training mode.
         self.model.train()
@@ -309,11 +307,6 @@ class Trainer(object):
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)
 
-            report_stats = self._maybe_report_training(
-                step, train_steps,
-                self.optim.learning_rate(),
-                report_stats)
-
             if valid_iter is not None and step % valid_steps == 0:
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: validate step %d'
@@ -348,7 +341,12 @@ class Trainer(object):
                      and step % save_checkpoint_steps == 0)):
                 self.model_saver.save(step, moving_average=self.moving_average, report_stats=report_stats)
 
-            if train_steps > 0 and step >= train_steps:
+            report_stats = self._maybe_report_training(
+                step, train_steps,
+                self.optim.learning_rate(),
+                report_stats)
+
+            if 0 < train_steps <= step:
                 break
 
         if self.model_saver is not None:
@@ -476,6 +474,7 @@ class Trainer(object):
                 if self._sampling_type != "None" and self._twopass:  # Transformer
                     outputs, attns = self.schedule_samples_model(src, tgt, src_lengths, target_size,
                                                                  src_pos, tgt_pos, batch.batch_size, bptt, step)
+                    attns_path = None
                 else:
                     # new_tgt = torch.zeros(tgt.shape).type_as(tgt.data)
                     # if tgt.size(0) >= src.size(0):
@@ -497,8 +496,7 @@ class Trainer(object):
                         normalization=normalization,
                         shard_size=self.shard_size,
                         trunc_start=j,
-                        trunc_size=trunc_size,
-                        attns_path=attns_path)
+                        trunc_size=trunc_size, attns_path=attns_path)
 
                     if loss is not None:
                         self.optim.backward(loss)

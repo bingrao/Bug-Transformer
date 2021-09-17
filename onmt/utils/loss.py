@@ -2,6 +2,7 @@
 This includes: LossComputeBase and the standard NMTLossCompute, and
                sharded loss compute stuff.
 """
+from __future__ import division
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -63,8 +64,7 @@ def build_loss_compute(model, tgt_field, opt, train=True):
     if opt.copy_attn:
         if opt.model_task == ModelTask.SEQ2SEQ:
             compute = onmt.modules.CopyGeneratorLossCompute(
-                criterion, loss_gen, tgt_field.vocab,
-                opt.copy_loss_by_seqlength,
+                criterion, loss_gen, tgt_field.vocab, opt.copy_loss_by_seqlength,
                 lambda_coverage=opt.lambda_coverage
             )
         elif opt.model_task == ModelTask.LANGUAGE_MODEL:
@@ -361,7 +361,8 @@ class CommonLossCompute(LossComputeBase):
                 align_head = align_head.to(loss.dtype)
             if ref_align.dtype != loss.dtype:
                 ref_align = ref_align.to(loss.dtype)
-            align_loss = self._compute_alignement_loss(align_head=align_head, ref_align=ref_align)
+            align_loss = self._compute_alignement_loss(
+                align_head=align_head, ref_align=ref_align)
             if self.loss_uncertainty:
                 loss = torch.exp(-self.tgt_log_var) * loss + 0.5 * self.tgt_log_var
                 align_loss = 0.5 * torch.exp(-self.align_log_var) * align_loss + self.align_log_var
