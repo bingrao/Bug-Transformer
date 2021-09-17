@@ -613,6 +613,8 @@ def model_opts(parser):
               help='Train a coverage attention layer.')
     group.add('--lambda_coverage', '-lambda_coverage', type=float, default=0.0,
               help='Lambda value for coverage loss of See et al (2017)')
+    group.add('--loss_uncertainty', '-loss_uncertainty', action="store_true",
+              help='When available, train to copy.')
     group.add('--loss_scale', '-loss_scale', type=float, default=0,
               help="For FP16 training, the static loss scale to use. If not "
                    "set, the loss scale is dynamically computed.")

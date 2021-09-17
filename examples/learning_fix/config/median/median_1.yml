@@ -73,7 +73,7 @@ train:
   lambda_align: 0.05
   alignment_layer: -1
   alignment_heads: 4
-full_context_alignment: true
+  full_context_alignment: true
 
   master_port: 8002
   world_size: 2

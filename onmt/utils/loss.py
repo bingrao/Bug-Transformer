@@ -86,11 +86,13 @@ def build_loss_compute(model, tgt_field, opt, train=True, path_loss=False):
                 criterion,
                 loss_gen,
                 lambda_coverage=opt.lambda_coverage,
-                lambda_align=opt.lambda_align, path_loss=path_loss
+                lambda_align=opt.lambda_align,
+                path_loss=path_loss,
+                loss_uncertainty=opt.loss_uncertainty
             )
         elif opt.model_task == ModelTask.LANGUAGE_MODEL:
             assert (
-                opt.lambda_align == 0.0
+                    opt.lambda_align == 0.0
             ), "lamdba_align not supported in LM loss"
             compute = LMLossCompute(
                 criterion,
@@ -126,7 +128,7 @@ class LossComputeBase(nn.Module):
         normalzation (str): normalize by "sents" or "tokens"
     """
 
-    def __init__(self, criterion, generator, path_loss=False):
+    def __init__(self, criterion, generator, path_loss=False, **kwargs):
         super(LossComputeBase, self).__init__()
         self.criterion = criterion
         self.generator = generator
@@ -252,6 +254,7 @@ class LabelSmoothingLoss(nn.Module):
     KL-divergence between q_{smoothed ground truth prob.}(w)
     and p_{prob. computed by model}(w) is minimized.
     """
+
     def __init__(self, label_smoothing, tgt_vocab_size, ignore_index=-100):
         assert 0.0 < label_smoothing <= 1.0
         self.ignore_index = ignore_index
@@ -282,12 +285,18 @@ class CommonLossCompute(LossComputeBase):
 
     Implement loss compatible with coverage and alignement shards
     """
+
     def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0, tgt_shift_index=1, path_loss=False):
-        super(CommonLossCompute, self).__init__(criterion, generator, path_loss)
+                 lambda_coverage=0.0, lambda_align=0.0, tgt_shift_index=1, path_loss=False, **kwargs):
+        super(CommonLossCompute, self).__init__(criterion, generator, path_loss, **kwargs)
         self.lambda_coverage = lambda_coverage
         self.lambda_align = lambda_align
         self.tgt_shift_index = tgt_shift_index
+        self.loss_uncertainty = kwargs.get("loss_uncertainty", False)
+        if self.loss_uncertainty:
+            # Weight definition for each loss
+            self.tgt_log_var = torch.nn.Parameter(torch.zeros(1), requires_grad=True)
+            self.align_log_var = torch.nn.Parameter(torch.zeros(1), requires_grad=True)
 
     def _add_coverage_shard_state(self, shard_state, attns):
         coverage = attns.get("coverage", None)
@@ -342,8 +351,10 @@ class CommonLossCompute(LossComputeBase):
                 align_head = align_head.to(loss.dtype)
             if ref_align.dtype != loss.dtype:
                 ref_align = ref_align.to(loss.dtype)
-            align_loss = self._compute_alignement_loss(
-                align_head=align_head, ref_align=ref_align)
+            align_loss = self._compute_alignement_loss(align_head=align_head, ref_align=ref_align)
+            if self.loss_uncertainty:
+                loss = torch.exp(-self.tgt_log_var) * loss + 0.5 * self.tgt_log_var
+                align_loss = 0.5 * torch.exp(-self.align_log_var) * align_loss + self.align_log_var
             loss += align_loss
         stats = self._stats(loss.clone(), scores, gtruth)
 
@@ -374,7 +385,7 @@ class CommonLossCompute(LossComputeBase):
         align_matrix_size = [batch_size, pad_tgt_size, pad_src_size]
         ref_align = onmt.utils.make_batch_align_matrix(
             align_idx, align_matrix_size, normalize=True
-        )   # torch.Size([40, 32, 48])
+        )  # torch.Size([40, 32, 48])
         # NOTE: tgt-src ref alignement that in range_ of shard
         # (coherent with batch.tgt)
         shard_state.update(
@@ -391,7 +402,8 @@ class CommonLossCompute(LossComputeBase):
         # So, the correspand position in ref_align should also be 0
         # Therefore, clip align_head to > 1e-18 should be bias free.
         align_loss = -align_head.clamp(min=1e-18).log().mul(ref_align).sum()
-        align_loss *= self.lambda_align
+        if not self.loss_uncertainty:
+            align_loss *= self.lambda_align
         return align_loss
 
     def _make_shard_state(self, batch, output, range_, attns=None):
@@ -429,19 +441,22 @@ class NMTLossCompute(CommonLossCompute):
     """
     Standard NMT Loss Computation.
     """
+
     def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0, path_loss=False):
+                 lambda_coverage=0.0, lambda_align=0.0, path_loss=False, **kwargs):
         super(NMTLossCompute, self).__init__(criterion, generator,
                                              normalization=normalization,
                                              lambda_coverage=lambda_coverage,
                                              lambda_align=lambda_align,
-                                             tgt_shift_index=1, path_loss=path_loss)
+                                             tgt_shift_index=1,
+                                             path_loss=path_loss, **kwargs)
 
 
 class LMLossCompute(CommonLossCompute):
     """
     Standard LM Loss Computation.
     """
+
     def __init__(self, criterion, generator, normalization="sents",
                  lambda_coverage=0.0, lambda_align=0.0, path_loss=False):
         super(LMLossCompute, self).__init__(criterion, generator,

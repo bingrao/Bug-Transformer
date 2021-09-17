@@ -1,12 +1,22 @@
 preprocess:
   work_model: preprocess
+
   train_src: examples/learning_fix/data/big/train-buggy.txt
+  train_src_path: examples/learning_fix/data/big/train-buggy-path.txt
   train_tgt: examples/learning_fix/data/big/train-fixed.txt
+  train_tgt_path: examples/learning_fix/data/big/train-fixed-path.txt
+  train_align: examples/learning_fix/data/big/big-train-feedward.talp
+
   valid_src: examples/learning_fix/data/big/eval-buggy.txt
+  valid_src_path: examples/learning_fix/data/big/eval-buggy-path.txt
   valid_tgt: examples/learning_fix/data/big/eval-fixed.txt
+  valid_tgt_path: examples/learning_fix/data/big/eval-fixed-path.txt
+  valid_align: examples/learning_fix/data/big/big-eval-feedward.talp
+
+
   save_data: examples/learning_fix/data/big/big
-  src_seq_length: 99042
-  tgt_seq_length: 99042
+  src_seq_length: 10280
+  tgt_seq_length: 10280
   src_seq_length_trunc: 400
   tgt_seq_length_trunc: 200
   num_threads: 10
@@ -18,63 +28,68 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/big/big
-  save_model: examples/learning_fix/data/big/2/big
-  train_from: examples/learning_fix/data/big/2/big-step-200000-acc-83.59-ppl-1.74-xent-0.56.pt
-  save_checkpoint_steps: 5000
-  keep_checkpoint: 10
+  save_checkpoint_steps: 3000
+  keep_checkpoint: 100
   seed: 3435
-  train_steps: 400000
+  train_steps: 100000
   valid_steps: 5000
-  early_stopping: 5
+  early_stopping: 10
   warmup_steps: 4000
   report_every: 1000
 
   decoder_type: transformer
   encoder_type: transformer
-  word_vec_size: 64
-  rnn_size: 64
+  word_vec_size: 512
+  rnn_size: 512
   layers: 6
-  transformer_ff: 256
+  transformer_ff: 2048
   heads: 8
 
-  accum_count: 8
+  accum_count: [4]
+  accum_steps: [0]
+  model_dtype: "fp32"
   optim: adam
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
   learning_rate: 0.01
-  max_grad_norm: 0.0
+  max_grad_norm: 0
 
-  batch_size: 1024
+  batch_size: 4096
   batch_type: tokens
   normalization: tokens
-  dropout: 0.1
+  dropout: 0.2
+  attention_dropout: [0.1]
   label_smoothing: 0.1
+  loss_uncertainty: true
 
-  max_generator_batches: 2
+  max_generator_batches: 0
 
   param_init: 0.0
   param_init_glorot: 'true'
   position_encoding: 'true'
+  path_encoding: 'false'
 
-  master_port: 8003
-  world_size: 4
+  lambda_align: 0.05
+  alignment_layer: -1
+  alignment_heads: 4
+  full_context_alignment: true
+
+  master_port: 8001
+  world_size: 2
   gpu_ranks:
     - 0
     - 1
-    - 2
-    - 3
 
 translate:
   work_model: translate
-#  model: examples/learning_fix/data/big/big_step_50000.pt
+  model: examples/learning_fix/data/big/1/big-step-36000-acc-92.94-ppl-1.31-xent-0.27.pt
   src: examples/learning_fix/data/big/test-buggy.txt
   tgt: examples/learning_fix/data/big/test-fixed.txt
-  output: examples/learning_fix/data/big/2/predictions.txt
   data_type: "code"
   share_vocab: True
   min_length: 0
   max_length: 200
-  batch_size: 32
-  gpu: 0
+  batch_size: 16
+  gpu: 3
 #  report_align: 'true'

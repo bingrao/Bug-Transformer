@@ -74,7 +74,7 @@ train:
   alignment_heads: 4
   full_context_alignment: true
 
-  master_port: 8003
+  master_port: 8002
   world_size: 2
   gpu_ranks:
     - 0
