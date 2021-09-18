@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="nmt_train" type="PythonConfigurationType" factoryName="Python">
-    <module name="OpenNMT-py" />
+    <module name="Bug-Transformer" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
