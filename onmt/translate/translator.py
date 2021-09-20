@@ -27,6 +27,8 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
                               if len(opt.models) > 1 else onmt.model_builder.load_test_model, "translate")
     fields, model, model_opt = load_test_model(opt)
 
+    model_opt.path_encoding = False
+
     scorer = onmt.translate.GNMTGlobalScorer.from_opt(opt)
 
     translator = Translator.from_opt(
@@ -582,7 +584,7 @@ class Translator(object):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) \
             else (batch.src, None)
 
-        enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths, src_path_vec=src_path_vec)
+        enc_states, memory_bank, src_lengths = self.model.encoder(src, src_lengths)
 
         if src_lengths is None:
             assert not isinstance(memory_bank, tuple), \
@@ -618,7 +620,7 @@ class Translator(object):
         tgt_path_vec = kwargs.get("tgt_path_vec", None)
 
         dec_out, dec_attn = self.model.decoder(decoder_in, memory_bank, memory_lengths=memory_lengths,
-                                               step=step, tgt_path_vec=tgt_path_vec)
+                                               step=step)
 
         # Generator forward.
         if not self.copy_attn:

@@ -31,7 +31,7 @@ train:
   save_checkpoint_steps: 2000
   keep_checkpoint: 1000
   seed: 3435
-  train_steps: 100000
+  train_steps: 1000000
   valid_steps: 5000
   early_stopping: 10
   warmup_steps: 4000
@@ -52,8 +52,8 @@ train:
   optim: adam
   adam_beta1: 0.9
   adam_beta2: 0.98
-  decay_method: noam
-  learning_rate: 0.01
+  decay_method: "noam"
+  learning_rate: 2
   max_grad_norm: 0
 
   batch_size: 2048
@@ -81,6 +81,7 @@ train:
   gpu_ranks:
     - 0
     - 1
+  model: examples/learning_fix/data/small/4/small-step-100000-acc-93.92-ppl-1.12-xent-0.11.pt
 
 translate:
   work_model: translate
@@ -95,3 +96,4 @@ translate:
   batch_size: 16
   gpu: 0
 #  report_align: 'true'
+  model: examples/learning_fix/data/small/4/small-step-100000-acc-93.92-ppl-1.12-xent-0.11.pt

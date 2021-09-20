@@ -21,12 +21,15 @@ class Statistics(object):
     * elapsed time
     """
 
-    def __init__(self, loss=0, n_words=0, n_correct=0):
+    def __init__(self, loss=0, n_words=0, n_correct=0, align_loss=0, num_align=0):
         self.loss = loss
         self.n_words = n_words
         self.n_correct = n_correct
         self.n_src_words = 0
         self.start_time = time.time()
+
+        self.align_loss = align_loss
+        self.num_align = num_align
 
     @staticmethod
     def all_gather_stats(stat, max_size=4096):
@@ -85,9 +88,15 @@ class Statistics(object):
         self.loss += stat.loss
         self.n_words += stat.n_words
         self.n_correct += stat.n_correct
+        self.align_loss += stat.align_loss
+        self.num_align += stat.num_align
 
         if update_n_src_words:
             self.n_src_words += stat.n_src_words
+
+    def align(self):
+        """ compute accuracy """
+        return 100 * (self.align_loss / self.num_align)
 
     def accuracy(self):
         """ compute accuracy """
@@ -118,12 +127,13 @@ class Statistics(object):
         if num_steps > 0:
             step_fmt = "%s/%5d" % (step_fmt, num_steps)
         logger.info(
-            ("Step %s; acc: %6.2f; ppl: %5.2f; xent: %4.2f; " +
+            ("Step %s; acc: %6.2f; ppl: %5.2f; xent: %4.2f; align: %6.2f; " +
              "lr: %7.5f; %3.0f/%3.0f tok/s; %6.0f sec")
             % (step_fmt,
                self.accuracy(),
                self.ppl(),
                self.xent(),
+               self.align(),
                learning_rate,
                self.n_src_words / (t + 1e-5),
                self.n_words / (t + 1e-5),

@@ -208,7 +208,7 @@ class LossComputeBase(nn.Module):
             batch_stats.update(stats)
         return None, batch_stats
 
-    def _stats(self, loss, scores, target):
+    def _stats(self, loss, scores, target, align_loss=None, num_align=0):
         """
         Args:
             loss (:obj:`FloatTensor`): the loss computed by the loss criterion.
@@ -222,7 +222,8 @@ class LossComputeBase(nn.Module):
         non_padding = target.ne(self.padding_idx)
         num_correct = pred.eq(target).masked_select(non_padding).sum().item()
         num_non_padding = non_padding.sum().item()
-        return onmt.utils.Statistics(loss.item(), num_non_padding, num_correct)
+        return onmt.utils.Statistics(loss.item(), num_non_padding, num_correct,
+                                     align_loss=align_loss.item(), num_align=num_align)
 
     def _bottle(self, _v):
         return _v.view(-1, _v.size(2))
@@ -337,6 +338,8 @@ class CommonLossCompute(LossComputeBase):
         :param ref_align:
         :return:
         """
+        num_align = kwargs.get('num_align', None)
+
         # bottled_output.shape: [shard_size*batch_size, dim] e.g. torch.Size([122, 512])
         bottled_output = self._bottle(output)
 
@@ -356,18 +359,22 @@ class CommonLossCompute(LossComputeBase):
                 std_attn=std_attn, coverage_attn=coverage_attn)
             loss += coverage_loss
 
+        _align_loss = 0
         if self.lambda_align != 0.0:
             if align_head.dtype != loss.dtype:  # Fix FP16
                 align_head = align_head.to(loss.dtype)
             if ref_align.dtype != loss.dtype:
                 ref_align = ref_align.to(loss.dtype)
-            align_loss = self._compute_alignement_loss(
+            _align_loss = self._compute_alignement_loss(
                 align_head=align_head, ref_align=ref_align)
+
             if self.loss_uncertainty:
                 loss = torch.exp(-self.tgt_log_var) * loss + 0.5 * self.tgt_log_var
-                align_loss = 0.5 * torch.exp(-self.align_log_var) * align_loss + self.align_log_var
+                align_loss = 0.5 * torch.exp(-self.align_log_var) * _align_loss + self.align_log_var
+            else:
+                align_loss = _align_loss * self.lambda_align
             loss += align_loss
-        stats = self._stats(loss.clone(), scores, gtruth)
+        stats = self._stats(loss.clone(), scores, gtruth, align_loss=_align_loss, num_align=num_align)
 
         return loss, stats
 
@@ -383,6 +390,7 @@ class CommonLossCompute(LossComputeBase):
         if attns_path:
             attn_path_align = attns_path.get("align", None)
             if attn_path_align is not None:
+                # TODO use dot product for future
                 attn_align = attn_align + attn_path_align
 
         # align_idx should be a Tensor in size([N, 3]), N is total number
@@ -408,6 +416,7 @@ class CommonLossCompute(LossComputeBase):
             {
                 "align_head": attn_align,
                 "ref_align": ref_align[:, range_start:range_end, :],
+                "num_align": align_idx.size(0),
             }
         )
 
@@ -418,8 +427,6 @@ class CommonLossCompute(LossComputeBase):
         # So, the correspand position in ref_align should also be 0
         # Therefore, clip align_head to > 1e-18 should be bias free.
         align_loss = -align_head.clamp(min=1e-18).log().mul(ref_align).sum()
-        if not self.loss_uncertainty:
-            align_loss *= self.lambda_align
         return align_loss
 
 
