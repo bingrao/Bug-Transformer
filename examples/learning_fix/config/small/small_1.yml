@@ -81,7 +81,7 @@ train:
     - 0
     - 1
 
-  model: examples/learning_fix/data/small/1/small-step-100000-acc-94.48-ppl-1.23-xent-0.21.pt
+  train_from: examples/learning_fix/data/small/1/small-step-100000-acc-94.48-ppl-1.23-xent-0.21.pt
 
 translate:
   work_model: translate

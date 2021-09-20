@@ -80,7 +80,7 @@ train:
   gpu_ranks:
     - 0
     - 1
-  model: examples/learning_fix/data/small/3/small-step-100000-acc-93.61-ppl-1.26-xent-0.23.pt
+  train_from: examples/learning_fix/data/small/3/small-step-100000-acc-93.61-ppl-1.26-xent-0.23.pt
 
 translate:
   work_model: translate
