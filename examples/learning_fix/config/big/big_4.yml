@@ -52,7 +52,7 @@ train:
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
-  learning_rate: 0.01
+  learning_rate: 2
   max_grad_norm: 0
 
   batch_size: 4096
@@ -68,18 +68,17 @@ train:
   param_init: 0.0
   param_init_glorot: 'true'
   position_encoding: 'true'
-  path_encoding: 'false'
+  path_encoding: 'true'
 
   lambda_align: 0.05
   alignment_layer: -1
   alignment_heads: 4
   full_context_alignment: true
 
-  master_port: 8001
-  world_size: 2
+  master_port: 8004
+  world_size: 4
   gpu_ranks:
     - 0
-    - 1
 
 translate:
   work_model: translate
