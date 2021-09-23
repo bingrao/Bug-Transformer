@@ -338,7 +338,7 @@ class CommonLossCompute(LossComputeBase):
         :param ref_align:
         :return:
         """
-        num_align = kwargs.get('num_align', None)
+        num_align = kwargs.get('num_align', 0)
 
         # bottled_output.shape: [shard_size*batch_size, dim] e.g. torch.Size([122, 512])
         bottled_output = self._bottle(output)
@@ -359,7 +359,7 @@ class CommonLossCompute(LossComputeBase):
                 std_attn=std_attn, coverage_attn=coverage_attn)
             loss += coverage_loss
 
-        _align_loss = 0
+        _align_loss = torch.tensor(0)
         if self.lambda_align != 0.0:
             if align_head.dtype != loss.dtype:  # Fix FP16
                 align_head = align_head.to(loss.dtype)

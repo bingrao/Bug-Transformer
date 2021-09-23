@@ -96,7 +96,7 @@ class Statistics(object):
 
     def align(self):
         """ compute accuracy """
-        return 100 * (self.align_loss / self.num_align)
+        return 100 * (self.align_loss / (self.num_align + 1))
 
     def accuracy(self):
         """ compute accuracy """
