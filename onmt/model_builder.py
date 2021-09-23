@@ -280,7 +280,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
             generator.linear.weight = model.decoder.embeddings.word_lut.weight
 
     # Bing: scheduled sampled
-    if model_opt.sampling_type == 'always_sample' \
+    if hasattr(model, "sampling_type") and model_opt.sampling_type == 'always_sample' \
             and model_opt.mixture_type \
             and 'tf_gate' in model_opt.mixture_type:
         model.tf_gate = nn.Sequential(nn.Linear(len(fields["tgt"].vocab), 1), nn.Sigmoid())
