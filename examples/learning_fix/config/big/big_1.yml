@@ -28,11 +28,11 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/big/big
-  save_checkpoint_steps: 3000
+  save_checkpoint_steps: 6000
   keep_checkpoint: 100
   seed: 3435
   train_steps: 300000
-  valid_steps: 5000
+  valid_steps: 3000
   early_stopping: 10
   warmup_steps: 4000
   report_every: 1000
@@ -52,10 +52,10 @@ train:
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: noam
-  learning_rate: 0.01
+  learning_rate: 2
   max_grad_norm: 0
 
-  batch_size: 4096
+  batch_size: 1024
   batch_type: tokens
   normalization: tokens
   dropout: 0.2
@@ -75,10 +75,9 @@ train:
   full_context_alignment: true
 
   master_port: 8002
-  world_size: 2
+  world_size: 1
   gpu_ranks:
     - 0
-    - 1
 
 translate:
   work_model: translate
@@ -89,6 +88,6 @@ translate:
   share_vocab: True
   min_length: 0
   max_length: 200
-  batch_size: 16
-  gpu: 3
+  batch_size: 8
+  gpu: 0
 #  report_align: 'true'

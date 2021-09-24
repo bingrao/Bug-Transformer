@@ -28,11 +28,11 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  save_checkpoint_steps: 2000
-  keep_checkpoint: 1000
+  save_checkpoint_steps: 8000
+  keep_checkpoint: 100
   seed: 3435
   train_steps: 1000000
-  valid_steps: 5000
+  valid_steps: 4000
   early_stopping: 10
   warmup_steps: 4000
   report_every: 1000
@@ -56,12 +56,13 @@ train:
   learning_rate: 2
   max_grad_norm: 0
 
-  batch_size: 2048
+  batch_size: 4096
   batch_type: tokens
   normalization: tokens
   dropout: 0.2
   attention_dropout: [0.1]
   label_smoothing: 0.1
+  loss_uncertainty: false
 
   max_generator_batches: 0
 
@@ -76,12 +77,11 @@ train:
   full_context_alignment: true
 
   master_port: 8001
-  world_size: 2
+  world_size: 1
   gpu_ranks:
     - 0
-    - 1
 
-  train_from: examples/learning_fix/data/small/1/small-step-100000-acc-94.48-ppl-1.23-xent-0.21.pt
+#  train_from: examples/learning_fix/data/small/1/small-step-100000-acc-94.48-ppl-1.23-xent-0.21.pt
 
 translate:
   work_model: translate
@@ -96,4 +96,4 @@ translate:
   batch_size: 16
   gpu: 0
 #  report_align: 'true'
-  model: examples/learning_fix/data/small/1/small-step-100000-acc-94.48-ppl-1.23-xent-0.21.pt
+#  model: examples/learning_fix/data/small/1/small-step-100000-acc-94.48-ppl-1.23-xent-0.21.pt

@@ -647,7 +647,7 @@ case ${target} in
       for n_best in ${n_bests[*]}
       do
         _performance "${n_best}" "similarity"
-        _performance "${n_best}" "bleu"
+#        _performance "${n_best}" "bleu"
 #        _performance "${n_best}" "ast"
         printf "\n\n" | tee -a "${LogFile}"
       done

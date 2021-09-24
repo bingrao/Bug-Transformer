@@ -56,7 +56,7 @@ train:
   learning_rate: 2
   max_grad_norm: 0
 
-  batch_size: 4096
+  batch_size: 1024
   batch_type: tokens
   normalization: tokens
   dropout: 0.2
@@ -91,5 +91,5 @@ translate:
   min_length: 0
   max_length: 150
   batch_size: 32
-  gpu: 0
+  gpu: 2
 #  report_align: 'true'
