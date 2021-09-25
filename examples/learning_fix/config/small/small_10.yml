@@ -91,3 +91,4 @@ translate:
   batch_size: 16
   gpu: 0
 #  report_align: 'true'
+  model: examples/learning_fix/data/small/10/small-step-30000-acc-99.94-ppl-1.00-xent-0.00.pt
