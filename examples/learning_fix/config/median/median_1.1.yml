@@ -1,0 +1,95 @@
+preprocess:
+  work_model: preprocess
+
+  train_src: examples/learning_fix/data/median/train-buggy.txt
+  train_src_path: examples/learning_fix/data/median/train-buggy-path.txt
+  train_tgt: examples/learning_fix/data/median/train-fixed.txt
+  train_tgt_path: examples/learning_fix/data/median/train-fixed-path.txt
+  train_align: examples/learning_fix/data/median/median-train-feedward.talp
+
+  valid_src: examples/learning_fix/data/median/eval-buggy.txt
+  valid_src_path: examples/learning_fix/data/median/eval-buggy-path.txt
+  valid_tgt: examples/learning_fix/data/median/eval-fixed.txt
+  valid_tgt_path: examples/learning_fix/data/median/eval-fixed-path.txt
+  valid_align: examples/learning_fix/data/median/median-eval-feedward.talp
+
+
+  save_data: examples/learning_fix/data/median/median
+  src_seq_length: 65455
+  tgt_seq_length: 65455
+  src_seq_length_trunc: 400
+  tgt_seq_length_trunc: 200
+  num_threads: 10
+  overwrite: True
+  share_vocab: True
+  pos_vec_size: 256
+  data_type: "code"
+
+train:
+  work_model: train
+  data: examples/learning_fix/data/median/median
+  save_checkpoint_steps: 6000
+  keep_checkpoint: 100
+  seed: 3435
+  train_steps: 1000000
+  valid_steps: 3000
+  early_stopping: 5
+  warmup_steps: 4000
+  report_every: 1000
+
+
+  decoder_type: transformer
+  encoder_type: transformer
+  word_vec_size: 512
+  rnn_size: 512
+  layers: 6
+  transformer_ff: 2048
+  heads: 8
+
+  accum_count: [4]
+  accum_steps: [0]
+  model_dtype: "fp32"
+  optim: adam
+  adam_beta1: 0.9
+  adam_beta2: 0.98
+  decay_method: noam
+  learning_rate: 0.2
+  max_grad_norm: 0
+
+  batch_size: 2048
+  batch_type: tokens
+  normalization: tokens
+  dropout: 0.2
+  attention_dropout: [0.1]
+  label_smoothing: 0.1
+
+  max_generator_batches: 0
+
+  param_init: 0.0
+  param_init_glorot: 'true'
+  position_encoding: 'true'
+  path_encoding: 'false'
+
+  lambda_align: 0.05
+  alignment_layer: -1
+  alignment_heads: 4
+  full_context_alignment: true
+
+  master_port: 8001
+  world_size: 1
+  gpu_ranks:
+    - 0
+
+translate:
+  work_model: translate
+  src: examples/learning_fix/data/median/test-buggy.txt
+  src_path: examples/learning_fix/data/median/test-buggy-path.txt
+  tgt: examples/learning_fix/data/median/test-fixed.txt
+  tgt_path: examples/learning_fix/data/median/test-fixed-path.txt
+  data_type: "code"
+  share_vocab: True
+  min_length: 0
+  max_length: 150
+  batch_size: 32
+  gpu: 0
+#  report_align: 'true'
