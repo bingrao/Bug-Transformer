@@ -48,10 +48,10 @@ function logInfo() {
     echo "[$(date +"%F %T,%3N") INFO] $1" | tee -a "${LogFile}"
 }
 
-if [ "$target" != "abstract" ]; then
-  logInfo "Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
-  $(echo "$configFile" | grep -Eq  '*_[0-9]+\.yml'$) || exit 1
-fi
+#if [ "$target" != "abstract" ]; then
+#  logInfo "Check Config file \"$configFile\" if match regex [*_[0-9]+\.yml], for example small_1.yml"
+#  $(echo "$configFile" | grep -Eq  '*_[0-9]+\.yml'$) || exit 1
+#fi
 
 logInfo "Check Config file \"${configFile}\" -------- Pass"
 
