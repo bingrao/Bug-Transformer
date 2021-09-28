@@ -28,13 +28,13 @@ preprocess:
 train:
   work_model: train
   data: examples/learning_fix/data/small/small
-  save_checkpoint_steps: 8000
+  save_checkpoint_steps: 5000
   keep_checkpoint: 100
   seed: 3435
   train_steps: 1000000
-  valid_steps: 4000
-  early_stopping: 10
-  warmup_steps: 4000
+  valid_steps: 5000
+  early_stopping: 5
+  warmup_steps: 10000
   report_every: 1000
 
 
@@ -53,7 +53,9 @@ train:
   adam_beta1: 0.9
   adam_beta2: 0.98
   decay_method: "noam"
-  learning_rate: 2
+  decay_steps: 10000
+  learning_rate: 0.01
+  learning_rate_decay: 0.001
   max_grad_norm: 0
 
   batch_size: 4096
@@ -77,10 +79,13 @@ train:
   full_context_alignment: true
 
   master_port: 8004
-  world_size: 1
+  world_size: 4
   gpu_ranks:
     - 0
-#  train_from: examples/learning_fix/data/small/4/small-step-100000-acc-93.92-ppl-1.12-xent-0.11.pt
+    - 1
+    - 2
+    - 3
+  train_from: examples/learning_fix/data/small/4/small-step-24000-acc-99.68-ppl-0.87-xent--0.13.pt
 
 translate:
   work_model: translate
@@ -95,4 +100,4 @@ translate:
   batch_size: 16
   gpu: 3
 #  report_align: 'true'
-  model: examples/learning_fix/data/small/4/small-step-16000-acc-99.38-ppl-0.89-xent--0.12.pt
+  model: examples/learning_fix/data/small/4/small-step-35000-acc-95.20-ppl-1.04-xent-0.04.pt
